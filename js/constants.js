@@ -1,7 +1,7 @@
 // Game constants
 const TILE_SIZE = 32;
-const MAP_WIDTH = 64;
-const MAP_HEIGHT = 64;
+const MAP_WIDTH = 128;
+const MAP_HEIGHT = 128;
 const MINIMAP_WIDTH = 184;
 const MINIMAP_HEIGHT = 140;
 

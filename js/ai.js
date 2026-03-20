@@ -67,6 +67,7 @@ class AIPlayer {
                 const building = new Building(tx, ty, 'enemy', type);
                 this.game.addEntity(building);
                 this.game.map.setOccupied(tx, ty, def.width, def.height, building.id);
+                this.game.map.setBuildingClearance(tx, ty, def.width, def.height, building.id);
                 this.game.enemyCredits -= def.cost;
                 this.buildIndex++;
                 this.lastBuildTime = Date.now();

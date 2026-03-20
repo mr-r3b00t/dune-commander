@@ -11,21 +11,26 @@ class UIManager {
         this.setupTabs();
         this.updateBuildList();
 
-        // Persistent sell button handler via event delegation
-        // Use mousedown instead of click — since updateSelectionInfo() rewrites innerHTML
-        // every frame, the button element gets destroyed between mousedown and mouseup,
-        // which prevents the 'click' event from ever firing.
-        document.getElementById('selection-info').addEventListener('mousedown', (evt) => {
-            const btn = evt.target.closest('#sell-btn');
-            if (btn) {
-                evt.preventDefault();
-                evt.stopPropagation();
-                const selected = this.game.entities.filter(e => e.selected);
-                if (selected.length === 1 && selected[0].isBuilding) {
-                    this.sellBuilding(selected[0]);
+        // Sell button — use global onclick handler since innerHTML is rewritten every frame
+        window._uiManager = this;
+        document.addEventListener('mousedown', (evt) => {
+            // Walk up from target to find sell-btn
+            let el = evt.target;
+            while (el && el !== document.body) {
+                if (el.id === 'sell-btn') {
+                    evt.preventDefault();
+                    evt.stopPropagation();
+                    evt.stopImmediatePropagation();
+                    const mgr = window._uiManager;
+                    const selected = mgr.game.entities.filter(e => e.selected);
+                    if (selected.length === 1 && selected[0].isBuilding) {
+                        mgr.sellBuilding(selected[0]);
+                    }
+                    return false;
                 }
+                el = el.parentElement;
             }
-        });
+        }, true);
     }
 
     setupTabs() {
@@ -282,6 +287,15 @@ class UIManager {
         }
     }
 
+    _handleSellClick(evt) {
+        evt.preventDefault();
+        evt.stopPropagation();
+        const selected = this.game.entities.filter(e => e.selected);
+        if (selected.length === 1 && selected[0].isBuilding) {
+            this.sellBuilding(selected[0]);
+        }
+    }
+
     sellBuilding(building) {
         if (!building || !building.isBuilding || building.owner !== 'player') return;
         if (building.type === 'construction_yard') return;
@@ -326,6 +340,7 @@ class UIManager {
 
         this.game.credits += sellPrice;
         this.game.addExplosion(building.x, building.y, false);
+        this.game.map.clearBuildingClearance(building.id);
         this.game.removeEntity(building);
         this.game.audio.play('cash');
         this.game.audio.speak('Structure sold');
@@ -378,6 +393,7 @@ class UIManager {
 
         this.game.addEntity(building);
         this.game.map.setOccupied(tx, ty, def.width, def.height, building.id);
+        this.game.map.setBuildingClearance(tx, ty, def.width, def.height, building.id);
         this.game.credits -= def.cost;
 
         // Animate construction
@@ -475,6 +491,23 @@ class UIManager {
             }
         }
 
+        // Show clearance zone below building
+        const clearY = ty + def.height;
+        if (clearY < MAP_HEIGHT) {
+            for (let dx = 0; dx < def.width; dx++) {
+                const cx = tx + dx;
+                if (isInBounds(cx, clearY)) {
+                    const clearScreenX = cx * TILE_SIZE - camera.x;
+                    const clearScreenY = clearY * TILE_SIZE - camera.y;
+                    ctx.fillStyle = 'rgba(180, 160, 100, 0.35)';
+                    ctx.fillRect(clearScreenX, clearScreenY, TILE_SIZE, TILE_SIZE);
+                    ctx.strokeStyle = 'rgba(180, 160, 100, 0.6)';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(clearScreenX, clearScreenY, TILE_SIZE, TILE_SIZE);
+                }
+            }
+        }
+
         // Label
         ctx.fillStyle = valid ? '#0f0' : '#f00';
         ctx.font = 'bold 11px monospace';
@@ -550,7 +583,7 @@ class UIManager {
             }
             if (e.isBuilding && e.owner === 'player' && e.type !== 'construction_yard') {
                 const sellPrice = Math.floor(BUILDING_DEFS[e.type].cost / 3);
-                html += `<br><button id="sell-btn" style="margin-top:4px;background:#6a2020;color:#e0d5a0;border:1px solid #a44;padding:2px 10px;cursor:pointer;font-family:monospace;font-size:10px;">SELL (💰${sellPrice})</button>`;
+                html += `<br><button id="sell-btn" onmousedown="window._uiManager._handleSellClick(event)" style="margin-top:4px;background:#6a2020;color:#e0d5a0;border:1px solid #a44;padding:2px 10px;cursor:pointer;font-family:monospace;font-size:10px;">SELL (💰${sellPrice})</button>`;
             }
             info.innerHTML = html;
         } else {

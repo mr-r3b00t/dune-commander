@@ -4,6 +4,7 @@ class GameMap {
         this.tiles = [];
         this.spiceAmount = [];
         this.occupied = [];
+        this.buildReserved = []; // tiles reserved as building clearance (passable but not buildable)
         this.fogOfWar = [];
         this.explored = [];
         this._dirtyTiles = new Set();
@@ -19,6 +20,7 @@ class GameMap {
             this.tiles[y] = [];
             this.spiceAmount[y] = [];
             this.occupied[y] = [];
+            this.buildReserved[y] = [];
             this.fogOfWar[y] = [];
             this.explored[y] = [];
             for (let x = 0; x < MAP_WIDTH; x++) {
@@ -55,32 +57,64 @@ class GameMap {
 
                 this.tiles[y][x] = terrain;
                 this.occupied[y][x] = null;
+                this.buildReserved[y][x] = null;
                 this.fogOfWar[y][x] = false;
                 this.explored[y][x] = false;
             }
         }
 
         // Player starting plateau (rock - safe from worms)
-        this.placeRockPlateau(5, 5, 8, 8);
+        this.placeRockPlateau(5, 5, 10, 10);
         // Enemy starting plateau
-        this.placeRockPlateau(MAP_WIDTH - 13, MAP_HEIGHT - 13, 8, 8);
+        this.placeRockPlateau(MAP_WIDTH - 15, MAP_HEIGHT - 15, 10, 10);
 
-        // Scatter additional rock plateaus across the map for expansion
-        this.placeRockPlateau(28, 12, 6, 5);
-        this.placeRockPlateau(12, 30, 5, 6);
-        this.placeRockPlateau(MAP_WIDTH - 18, 28, 6, 5);
-        this.placeRockPlateau(30, MAP_HEIGHT - 18, 5, 6);
-        this.placeRockPlateau(28, 28, 7, 7); // central plateau
+        // Expansion plateaus near player base
+        this.placeRockPlateau(18, 5, 7, 6);
+        this.placeRockPlateau(5, 18, 6, 7);
+        this.placeRockPlateau(20, 18, 7, 6);
 
-        // Guarantee spice fields near starting positions (on sand, reachable but exposed)
-        this.placeSpiceField(18, 8, 5);
-        this.placeSpiceField(10, 18, 4);
-        this.placeSpiceField(MAP_WIDTH - 19, MAP_HEIGHT - 9, 5);
-        this.placeSpiceField(MAP_WIDTH - 11, MAP_HEIGHT - 19, 4);
-        // Mid-map contested spice
-        this.placeSpiceField(32, 20, 4);
-        this.placeSpiceField(20, 32, 4);
-        this.placeSpiceField(35, 35, 5);
+        // Expansion plateaus near enemy base
+        this.placeRockPlateau(MAP_WIDTH - 25, MAP_HEIGHT - 11, 7, 6);
+        this.placeRockPlateau(MAP_WIDTH - 11, MAP_HEIGHT - 25, 6, 7);
+        this.placeRockPlateau(MAP_WIDTH - 27, MAP_HEIGHT - 24, 7, 6);
+
+        // Mid-map contested plateaus
+        this.placeRockPlateau(55, 55, 8, 8); // central plateau
+        this.placeRockPlateau(40, 30, 6, 6);
+        this.placeRockPlateau(30, 45, 6, 6);
+        this.placeRockPlateau(MAP_WIDTH - 40, 35, 6, 6);
+        this.placeRockPlateau(35, MAP_HEIGHT - 40, 6, 6);
+
+        // Outlying expansion plateaus
+        this.placeRockPlateau(70, 15, 6, 5);
+        this.placeRockPlateau(15, 70, 5, 6);
+        this.placeRockPlateau(MAP_WIDTH - 20, 50, 6, 5);
+        this.placeRockPlateau(50, MAP_HEIGHT - 20, 5, 6);
+        this.placeRockPlateau(85, 85, 6, 6);
+
+        // Spice fields near player base
+        this.placeSpiceField(22, 8, 5);
+        this.placeSpiceField(10, 22, 5);
+        this.placeSpiceField(30, 14, 4);
+
+        // Spice fields near enemy base
+        this.placeSpiceField(MAP_WIDTH - 23, MAP_HEIGHT - 9, 5);
+        this.placeSpiceField(MAP_WIDTH - 11, MAP_HEIGHT - 23, 5);
+        this.placeSpiceField(MAP_WIDTH - 31, MAP_HEIGHT - 15, 4);
+
+        // Mid-map contested spice (rich fields worth fighting over)
+        this.placeSpiceField(50, 40, 5);
+        this.placeSpiceField(40, 55, 5);
+        this.placeSpiceField(65, 65, 6);
+        this.placeSpiceField(75, 45, 4);
+        this.placeSpiceField(45, 80, 4);
+
+        // Distant spice fields
+        this.placeSpiceField(85, 20, 5);
+        this.placeSpiceField(20, 90, 5);
+        this.placeSpiceField(95, 70, 4);
+        this.placeSpiceField(70, 100, 4);
+        this.placeSpiceField(100, 100, 5);
     }
 
     placeSpiceField(cx, cy, radius) {
@@ -149,7 +183,8 @@ class GameMap {
         const t = this.tiles[ty][tx];
         if (t === TERRAIN.MOUNTAIN) return false;
         if (this.occupied[ty][tx]) return false;
-        return t === TERRAIN.ROCK || t === TERRAIN.CONCRETE || t === TERRAIN.SAND || t === TERRAIN.DUNES || t === TERRAIN.SPICE || t === TERRAIN.THICK_SPICE;
+        if (this.buildReserved[ty][tx]) return false; // clearance zone — no building allowed
+        return t === TERRAIN.ROCK || t === TERRAIN.CONCRETE;
     }
 
     canBuildAt(tx, ty, w, h) {
@@ -176,6 +211,35 @@ class GameMap {
             for (let dx = 0; dx < w; dx++) {
                 if (isInBounds(tx + dx, ty + dy)) {
                     this.occupied[ty + dy][tx + dx] = null;
+                }
+            }
+        }
+    }
+
+    // Set building clearance zone — row below the building becomes concrete pavement
+    // that units can walk on but other buildings cannot be placed on
+    setBuildingClearance(tx, ty, w, h, entityId) {
+        const clearY = ty + h; // row below the building
+        for (let dx = 0; dx < w; dx++) {
+            const cx = tx + dx;
+            if (isInBounds(cx, clearY)) {
+                this.buildReserved[clearY][cx] = entityId;
+                // Convert terrain to concrete so it's visually distinct and passable
+                if (this.tiles[clearY][cx] !== TERRAIN.ROCK && this.tiles[clearY][cx] !== TERRAIN.CONCRETE) {
+                    this.tiles[clearY][cx] = TERRAIN.CONCRETE;
+                    this.spiceAmount[clearY][cx] = 0;
+                    this._invalidateTerrainCache(cx, clearY);
+                }
+            }
+        }
+    }
+
+    // Clear building clearance zone when a building is sold or destroyed
+    clearBuildingClearance(entityId) {
+        for (let y = 0; y < MAP_HEIGHT; y++) {
+            for (let x = 0; x < MAP_WIDTH; x++) {
+                if (this.buildReserved[y][x] === entityId) {
+                    this.buildReserved[y][x] = null;
                 }
             }
         }

@@ -2708,7 +2708,7 @@ const SpriteRenderer = {
         ctx.restore();
     },
 
-    drawTurret(ctx, x, y, w, h, colors, target) {
+    drawTurret(ctx, x, y, w, h, colors, turretAngle) {
         ctx.save();
         ctx.translate(x, y);
         const t = Date.now();
@@ -2764,13 +2764,8 @@ const SpriteRenderer = {
         // Rivets on turret
         this._rivets(ctx, -5, -4, 5, 2.5);
 
-        // Gun barrel toward target
-        let angle = 0;
-        if (target) {
-            const dx = target.x - x;
-            const dy = target.y - y;
-            angle = Math.atan2(dx, -dy);
-        }
+        // Gun barrel — uses pre-calculated turretAngle
+        const angle = turretAngle || 0;
         const bLen = 16;
         const bx = Math.sin(angle) * bLen;
         const by = -Math.cos(angle) * bLen * 0.5 - 6.5;
@@ -2788,7 +2783,7 @@ const SpriteRenderer = {
         ctx.restore();
     },
 
-    drawRocketTurret(ctx, x, y, w, h, colors, target) {
+    drawRocketTurret(ctx, x, y, w, h, colors, turretAngle) {
         ctx.save();
         ctx.translate(x, y);
         const t = Date.now();
@@ -2840,13 +2835,8 @@ const SpriteRenderer = {
         // Rivets
         this._rivets(ctx, -7, -5, 7, 2.2);
 
-        // Dual rocket launcher pods
-        let angle = 0;
-        if (target) {
-            const dx = target.x - x;
-            const dy = target.y - y;
-            angle = Math.atan2(dx, -dy);
-        }
+        // Dual rocket launcher pods — uses pre-calculated turretAngle
+        const angle = turretAngle || 0;
         for (const offset of [-3.5, 3.5]) {
             const ox = Math.cos(angle) * offset;
             const oy = Math.sin(angle) * offset * 0.5;

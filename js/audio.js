@@ -571,6 +571,36 @@ class AudioManager {
                 this.playTone(250, 0.08, 'square', 0.1, 0.5);
                 break;
 
+            // --- C4 SOUNDS ---
+
+            case 'c4_plant':
+                // Mechanical click/attach sound
+                this.playTone(200, 0.05, 'square', 0.3);
+                this.playTone(150, 0.08, 'square', 0.2, 0.06);
+                this.playNoise(0.1, 0.15, 0.1);
+                // Arming beep
+                this.playTone(1200, 0.08, 'sine', 0.25, 0.2);
+                this.playTone(1200, 0.08, 'sine', 0.2, 0.4);
+                break;
+
+            case 'c4_beep':
+                // Warning beep — short high-pitched
+                if (!this._throttle('c4_beep', 600)) break;
+                this.playTone(1400, 0.06, 'sine', 0.2);
+                break;
+
+            case 'c4_explode':
+                // Massive C4 detonation — deeper and longer than normal explosion
+                this.playNoise(0.8, 0.8);
+                this.playTone(35, 0.7, 'sawtooth', 0.6);
+                this.playTone(20, 1.0, 'sine', 0.4, 0.1);
+                this.playTone(55, 0.5, 'square', 0.35, 0.15);
+                this.playTone(80, 0.3, 'sawtooth', 0.2, 0.3);
+                // Secondary explosion
+                this.playNoise(0.5, 0.5, 0.4);
+                this.playTone(40, 0.4, 'sawtooth', 0.3, 0.5);
+                break;
+
             // --- UI / OTHER ---
 
             case 'unitReady':

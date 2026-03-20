@@ -163,6 +163,85 @@ class Unit extends Entity {
                     }
                 }
                 break;
+            case 'moving_to_c4':
+                // Moving toward enemy building to plant C4
+                if (this.c4Target && this.c4Target.hp <= 0) {
+                    // Target already destroyed
+                    this.c4Target = null;
+                    this.state = 'idle';
+                    this.path = null;
+                    this.moving = false;
+                    break;
+                }
+                if (!this.path || this.pathIndex >= this.path.length) {
+                    this.moving = false;
+                    // Check if close enough to the building (adjacent)
+                    if (this.c4Target && this.c4Target.hp > 0) {
+                        const bldg = this.c4Target;
+                        const distX = Math.max(0, bldg.tx - this.tx, this.tx - (bldg.tx + bldg.width - 1));
+                        const distY = Math.max(0, bldg.ty - this.ty, this.ty - (bldg.ty + bldg.height - 1));
+                        if (distX <= 1 && distY <= 1) {
+                            // Close enough — start planting
+                            this.state = 'planting_c4';
+                            this.c4PlantStart = Date.now();
+                            this.c4PlantDuration = 2000; // 2 seconds to plant
+                            game.audio.play('c4_plant');
+                            if (this.owner === 'player') {
+                                game.audio.speak('Planting C4');
+                            }
+                        } else {
+                            // Try to get closer
+                            const bx = bldg.tx + Math.floor(bldg.width / 2);
+                            const by = bldg.ty + Math.floor(bldg.height / 2);
+                            if (!this.startPath(bx, by, game)) {
+                                this.state = 'idle';
+                                this.c4Target = null;
+                            }
+                        }
+                    } else {
+                        this.state = 'idle';
+                        this.c4Target = null;
+                    }
+                }
+                break;
+            case 'planting_c4':
+                // Commando is planting C4 — stand still and wait
+                this.path = null;
+                this.moving = false;
+                if (this.c4Target && this.c4Target.hp <= 0) {
+                    this.c4Target = null;
+                    this.state = 'idle';
+                    break;
+                }
+                if (Date.now() - this.c4PlantStart >= this.c4PlantDuration) {
+                    // C4 planted — register it and flee
+                    game.plantC4(this.c4Target, this);
+                    if (this.owner === 'player') {
+                        game.audio.speak('C4 planted — get clear!');
+                        game.ui.showStatus('C4 planted! 5 seconds to detonation!');
+                    }
+                    // Flee away from the building
+                    const bldg = this.c4Target;
+                    const dx = this.tx - (bldg.tx + bldg.width / 2);
+                    const dy = this.ty - (bldg.ty + bldg.height / 2);
+                    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                    const fleeX = Math.round(this.tx + (dx / len) * 6);
+                    const fleeY = Math.round(this.ty + (dy / len) * 6);
+                    // Clamp to map bounds
+                    const fx = Math.max(1, Math.min(MAP_WIDTH - 2, fleeX));
+                    const fy = Math.max(1, Math.min(MAP_HEIGHT - 2, fleeY));
+                    this.c4Target = null;
+                    this.state = 'fleeing_c4';
+                    this.startPath(fx, fy, game);
+                }
+                break;
+            case 'fleeing_c4':
+                // Running away from planted C4
+                if (!this.path || this.pathIndex >= this.path.length) {
+                    this.moving = false;
+                    this.state = 'idle';
+                }
+                break;
         }
     }
 
@@ -1132,6 +1211,23 @@ class Unit extends Entity {
                 ctx.fillStyle = pulse;
                 ctx.textAlign = 'center';
                 ctx.fillText('REPAIRING', screenX, labelY);
+            } else if (this.state === 'moving_to_c4') {
+                ctx.font = '9px monospace';
+                ctx.fillStyle = '#f80';
+                ctx.textAlign = 'center';
+                ctx.fillText('C4 MOVE', screenX, labelY);
+            } else if (this.state === 'planting_c4') {
+                ctx.font = '9px monospace';
+                const pulse = Math.sin(Date.now() / 200) > 0 ? '#f00' : '#f80';
+                ctx.fillStyle = pulse;
+                ctx.textAlign = 'center';
+                const pct = Math.floor(((Date.now() - this.c4PlantStart) / this.c4PlantDuration) * 100);
+                ctx.fillText(`PLANTING ${Math.min(pct, 100)}%`, screenX, labelY);
+            } else if (this.state === 'fleeing_c4') {
+                ctx.font = '9px monospace';
+                ctx.fillStyle = '#ff4444';
+                ctx.textAlign = 'center';
+                ctx.fillText('GET CLEAR!', screenX, labelY);
             }
         }
 

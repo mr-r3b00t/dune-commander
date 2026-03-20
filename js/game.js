@@ -52,6 +52,9 @@ class Game {
         this.selectStart = { x: 0, y: 0 };
         this.scrollSpeed = 12;
 
+        // C4 charges planted by commandos
+        this.c4Charges = [];
+
         // Sandworm
         this.sandworms = [];
         this.gameStartTime = Date.now();
@@ -98,16 +101,19 @@ class Game {
         const pCY = new Building(6, 6, 'player', 'construction_yard');
         this.addEntity(pCY);
         this.map.setOccupied(6, 6, 3, 3, pCY.id);
+        this.map.setBuildingClearance(6, 6, 3, 3, pCY.id);
 
         // Player starting wind trap
         const pWT = new Building(6, 10, 'player', 'wind_trap');
         this.addEntity(pWT);
         this.map.setOccupied(6, 10, 2, 2, pWT.id);
+        this.map.setBuildingClearance(6, 10, 2, 2, pWT.id);
 
         // Player starting refinery
         const pRef = new Building(10, 6, 'player', 'refinery');
         this.addEntity(pRef);
         this.map.setOccupied(10, 6, 3, 2, pRef.id);
+        this.map.setBuildingClearance(10, 6, 3, 2, pRef.id);
 
         // Player starting harvester (auto-harvests immediately)
         const pHarv = new Unit(10, 9, 'player', 'harvester');
@@ -118,15 +124,18 @@ class Game {
         const eCY = new Building(MAP_WIDTH - 10, MAP_HEIGHT - 10, 'enemy', 'construction_yard');
         this.addEntity(eCY);
         this.map.setOccupied(MAP_WIDTH - 10, MAP_HEIGHT - 10, 3, 3, eCY.id);
+        this.map.setBuildingClearance(MAP_WIDTH - 10, MAP_HEIGHT - 10, 3, 3, eCY.id);
 
         // Enemy starting buildings
         const eWT = new Building(MAP_WIDTH - 10, MAP_HEIGHT - 7, 'enemy', 'wind_trap');
         this.addEntity(eWT);
         this.map.setOccupied(MAP_WIDTH - 10, MAP_HEIGHT - 7, 2, 2, eWT.id);
+        this.map.setBuildingClearance(MAP_WIDTH - 10, MAP_HEIGHT - 7, 2, 2, eWT.id);
 
         const eRef = new Building(MAP_WIDTH - 7, MAP_HEIGHT - 10, 'enemy', 'refinery');
         this.addEntity(eRef);
         this.map.setOccupied(MAP_WIDTH - 7, MAP_HEIGHT - 10, 3, 2, eRef.id);
+        this.map.setBuildingClearance(MAP_WIDTH - 7, MAP_HEIGHT - 10, 3, 2, eRef.id);
 
         // Enemy starting harvester
         const eHarv = new Unit(MAP_WIDTH - 7, MAP_HEIGHT - 7, 'enemy', 'harvester');
@@ -377,7 +386,14 @@ class Game {
             const unit = selected[i];
             const dest = spreadPositions[i];
 
-            if (target && unit.attackRange > 0) {
+            if (target && unit.type === 'commando' && target.isBuilding && target.type !== 'wall') {
+                // Commando C4: move to building and plant explosives
+                const bx = target.tx + Math.floor(target.width / 2);
+                const by = target.ty + Math.floor(target.height / 2);
+                unit.c4Target = target;
+                unit.startPath(bx, by, this);
+                unit.state = 'moving_to_c4';
+            } else if (target && unit.attackRange > 0) {
                 unit.attackTarget(target, this);
             } else if (unit.type === 'harvester') {
                 // Harvesters: right-click on repair bay = go repair, then resume
@@ -425,8 +441,11 @@ class Game {
 
         this.audio.play('move');
 
-        // Voice for move/attack/harvest
-        if (target) {
+        // Voice for move/attack/harvest/c4
+        const anyC4 = selected.some(u => u.state === 'moving_to_c4');
+        if (anyC4) {
+            this.audio.speak('C4 ready — moving to target');
+        } else if (target) {
             this.audio.speak('Engaging target');
         } else if (clickedRefinery) {
             this.audio.speak('Returning to base');
@@ -496,6 +515,7 @@ class Game {
 
         if (entity.isBuilding) {
             this.map.clearOccupied(entity.tx, entity.ty, entity.width, entity.height);
+            this.map.clearBuildingClearance(entity.id);
         } else if (entity.isUnit) {
             if (this.map.occupied[entity.ty] && this.map.occupied[entity.ty][entity.tx] === entity.id) {
                 this.map.occupied[entity.ty][entity.tx] = null;
@@ -523,6 +543,58 @@ class Game {
 
     addExplosion(x, y, large) {
         this.particles.addExplosion(x, y, large);
+    }
+
+    plantC4(building, commando) {
+        this.c4Charges.push({
+            building: building,
+            plantedBy: commando,
+            plantTime: Date.now(),
+            detonateTime: Date.now() + 5000, // 5 seconds
+            beeped: 0
+        });
+    }
+
+    updateC4Charges() {
+        const now = Date.now();
+        for (let i = this.c4Charges.length - 1; i >= 0; i--) {
+            const c4 = this.c4Charges[i];
+
+            // Beeping countdown — beep every second, faster in last 2 seconds
+            const remaining = c4.detonateTime - now;
+            const beepCount = Math.floor((5000 - remaining) / 800);
+            if (beepCount > c4.beeped) {
+                c4.beeped = beepCount;
+                this.audio.play('c4_beep');
+            }
+
+            // Blinking light on the building
+            if (c4.building && c4.building.hp > 0) {
+                c4.building._c4Planted = true;
+                c4.building._c4Remaining = remaining;
+            }
+
+            // Detonate
+            if (now >= c4.detonateTime) {
+                if (c4.building && c4.building.hp > 0) {
+                    // Massive explosion — destroy the building
+                    const bx = c4.building.x;
+                    const by = c4.building.y;
+                    this.addExplosion(bx, by, true);
+                    this.addExplosion(bx - 15, by - 10, true);
+                    this.addExplosion(bx + 15, by + 10, true);
+                    this.audio.play('c4_explode');
+                    this.audio.play('building_destroyed');
+                    c4.building._c4Planted = false;
+                    // Deal massive damage (enough to destroy most buildings)
+                    const destroyed = c4.building.takeDamage(9999, c4.plantedBy ? c4.plantedBy.owner : 'player', this);
+                    if (destroyed) {
+                        this.audio.speak('C4 detonated — building destroyed');
+                    }
+                }
+                this.c4Charges.splice(i, 1);
+            }
+        }
     }
 
     updateCamera() {
@@ -889,16 +961,21 @@ class Game {
         // Dust trails for moving vehicles & smoke for damaged buildings
         for (const entity of this.entities) {
             if (entity.isUnit && entity.moving && entity.type !== 'light_infantry' && entity.type !== 'heavy_trooper' && entity.type !== 'rocket_infantry' && entity.type !== 'commando' && entity.type !== 'ornithopter') {
-                if (Math.random() < 0.3) {
+                // Only show dust trails if the tile is visible (not in fog/shroud)
+                if (this.map.fogOfWar[entity.ty] && this.map.fogOfWar[entity.ty][entity.tx] && Math.random() < 0.3) {
                     this.particles.addDustTrail(entity.x, entity.y);
                 }
             }
             if (entity.isBuilding && entity.hp < entity.maxHp * 0.5 && entity.hp > 0) {
-                if (Math.random() < 0.08) {
+                // Only show building smoke if visible
+                if (this.map.fogOfWar[entity.ty] && this.map.fogOfWar[entity.ty][entity.tx] && Math.random() < 0.08) {
                     this.particles.addBuildingSmoke(entity.x, entity.y - entity.height * TILE_SIZE * 0.3);
                 }
             }
         }
+
+        // Update C4 charges
+        this.updateC4Charges();
 
         // Update particles
         this.particles.update(this.deltaTime);
@@ -1221,6 +1298,7 @@ class Game {
                         entity.currentBuild = data.currentBuild;
                     }
                     this.map.setOccupied(data.tx, data.ty, entity.width, entity.height, entity.id);
+                    this.map.setBuildingClearance(data.tx, data.ty, entity.width, entity.height, entity.id);
                 } else {
                     entity = new Unit(data.tx, data.ty, data.owner, data.type);
                     entity.state = data.state;

@@ -44,6 +44,12 @@ class Building extends Entity {
         // Repair Bay / Hospital healing
         this.lastHealTick = 0;
         this.activelyHealing = false;
+
+        // Turret rotation (smooth tracking)
+        this.turretAngle = 0; // current barrel angle in radians
+        this.turretTargetAngle = 0; // desired angle toward target
+        this.turretTurnSpeed = (type === 'rocket_turret') ? 3 : 4; // radians per second
+        this.turretOnTarget = false; // true when barrel is close enough to fire
     }
 
     startRepair(game) {
@@ -190,6 +196,7 @@ class Building extends Entity {
 
     updateTurret(game) {
         const now = Date.now();
+        const dt = game.deltaTime / 1000; // seconds
         const cx = this.tx + this.width / 2;
         const cy = this.ty + this.height / 2;
 
@@ -242,14 +249,44 @@ class Building extends Entity {
             }
         }
 
-        // Attack
-        if (this.target && now - this.lastAttackTime >= this.attackSpeed) {
-            let etx, ety, targetX, targetY;
+        // Smooth turret rotation toward target
+        if (this.target) {
+            let targetX, targetY;
             if (this.target.isWorm) {
                 targetX = this.target.x;
                 targetY = this.target.y;
-                etx = Math.floor(targetX / TILE_SIZE);
-                ety = Math.floor(targetY / TILE_SIZE);
+            } else {
+                targetX = this.target.x;
+                targetY = this.target.y;
+            }
+            const dx = targetX - this.x;
+            const dy = targetY - this.y;
+            this.turretTargetAngle = Math.atan2(dx, -dy);
+
+            // Smoothly rotate toward target
+            let angleDiff = this.turretTargetAngle - this.turretAngle;
+            // Normalize to [-PI, PI]
+            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+            const maxRot = this.turretTurnSpeed * dt;
+            if (Math.abs(angleDiff) <= maxRot) {
+                this.turretAngle = this.turretTargetAngle;
+                this.turretOnTarget = true;
+            } else {
+                this.turretAngle += Math.sign(angleDiff) * maxRot;
+                this.turretOnTarget = Math.abs(angleDiff) < 0.15; // ~8.5 degrees tolerance
+            }
+        } else {
+            this.turretOnTarget = false;
+        }
+
+        // Attack — only fire when turret is aimed at the target
+        if (this.target && this.turretOnTarget && now - this.lastAttackTime >= this.attackSpeed) {
+            let etx, ety;
+            if (this.target.isWorm) {
+                etx = Math.floor(this.target.x / TILE_SIZE);
+                ety = Math.floor(this.target.y / TILE_SIZE);
             } else {
                 etx = this.target.isBuilding ? this.target.tx + this.target.width / 2 : this.target.tx;
                 ety = this.target.isBuilding ? this.target.ty + this.target.height / 2 : this.target.ty;
@@ -360,10 +397,10 @@ class Building extends Entity {
                 SpriteRenderer.drawHeavyFactory(ctx, screenX, screenY, w, h, colors);
                 break;
             case 'turret':
-                SpriteRenderer.drawTurret(ctx, screenX, screenY, w, h, colors, this.target);
+                SpriteRenderer.drawTurret(ctx, screenX, screenY, w, h, colors, this.turretAngle);
                 break;
             case 'rocket_turret':
-                SpriteRenderer.drawRocketTurret(ctx, screenX, screenY, w, h, colors, this.target);
+                SpriteRenderer.drawRocketTurret(ctx, screenX, screenY, w, h, colors, this.turretAngle);
                 break;
             case 'radar':
                 SpriteRenderer.drawRadar(ctx, screenX, screenY, w, h, colors);
@@ -394,6 +431,29 @@ class Building extends Entity {
         if (!this.isConstructing) {
             const hpRatio = this.hp / this.maxHp;
             SpriteRenderer._damageOverlay(ctx, screenX, screenY, w, h, hpRatio);
+        }
+
+        // C4 planted indicator — blinking red light and timer
+        if (this._c4Planted) {
+            const blink = Math.sin(Date.now() / 150) > 0;
+            if (blink) {
+                // Red blinking light
+                ctx.fillStyle = '#ff0000';
+                ctx.shadowColor = '#ff0000';
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.arc(screenX, screenY - h / 2 + 6, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+            // Timer text
+            if (this._c4Remaining != null) {
+                const secs = Math.max(0, this._c4Remaining / 1000).toFixed(1);
+                ctx.fillStyle = '#ff3333';
+                ctx.font = 'bold 10px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(`💣 ${secs}s`, screenX, screenY - h / 2 - 4);
+            }
         }
 
         // Construction progress overlay
