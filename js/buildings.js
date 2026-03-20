@@ -48,7 +48,7 @@ class Building extends Entity {
         // Turret rotation (smooth tracking)
         this.turretAngle = 0; // current barrel angle in radians
         this.turretTargetAngle = 0; // desired angle toward target
-        this.turretTurnSpeed = (type === 'rocket_turret') ? 3 : 4; // radians per second
+        this.turretTurnSpeed = (type === 'rocket_turret') ? 4 : 5; // radians per second
         this.turretOnTarget = false; // true when barrel is close enough to fire
     }
 
@@ -97,7 +97,7 @@ class Building extends Entity {
         // Reveal fog - radar buildings reveal a much larger area
         const cx = this.tx + Math.floor(this.width / 2);
         const cy = this.ty + Math.floor(this.height / 2);
-        const revealRadius = this.radarRadius > 0 ? this.radarRadius : 6;
+        const revealRadius = this.radarRadius > 0 ? this.radarRadius : 8;
         game.map.revealArea(cx, cy, revealRadius, this.owner);
     }
 
@@ -275,7 +275,7 @@ class Building extends Entity {
                 this.turretOnTarget = true;
             } else {
                 this.turretAngle += Math.sign(angleDiff) * maxRot;
-                this.turretOnTarget = Math.abs(angleDiff) < 0.15; // ~8.5 degrees tolerance
+                this.turretOnTarget = Math.abs(angleDiff) < 0.05; // ~3 degrees — turret must be very close to aimed
             }
         } else {
             this.turretOnTarget = false;

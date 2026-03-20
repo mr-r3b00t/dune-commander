@@ -218,7 +218,9 @@ class GameMap {
 
     // Set building clearance zone — row below the building becomes concrete pavement
     // that units can walk on but other buildings cannot be placed on
-    setBuildingClearance(tx, ty, w, h, entityId) {
+    // Turrets and walls are small defensive structures that don't need clearance
+    setBuildingClearance(tx, ty, w, h, entityId, buildingType) {
+        if (buildingType === 'turret' || buildingType === 'rocket_turret' || buildingType === 'wall') return;
         const clearY = ty + h; // row below the building
         for (let dx = 0; dx < w; dx++) {
             const cx = tx + dx;

@@ -377,19 +377,19 @@ const UNIT_DEFS = {
         description: 'Elite sniper commando. Devastating long-range shots. Only one allowed.'
     },
     devastator: {
-        name: 'Devastator',
+        name: 'Super Heavy Trooper',
         icon: '☠️',
         cost: 200,
         buildTime: 5000,
-        hp: 180,
+        hp: 200,
         speed: 0.6,
-        attackRange: 4,
+        attackRange: 5,
         attackDamage: 30,
         attackSpeed: 2000,
         buildAt: 'barracks',
         requires: ['barracks', 'heavy_factory'],
         house: 'harkonnen',
-        description: 'Harkonnen super heavy trooper. Slow but devastating firepower and thick armor.'
+        description: 'Harkonnen super heavy trooper. Heavily armored with twin assault cannons. Slow but devastating.'
     },
     ornithopter: {
         name: 'Ornithopter',

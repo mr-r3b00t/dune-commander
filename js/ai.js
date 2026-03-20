@@ -38,6 +38,9 @@ class AIPlayer {
             this.tryAttack();
         }
 
+        // Air strikes — send idle ornithopters with ammo to attack player base
+        this.tryAirStrike();
+
         // Manage harvesters
         this.manageHarvesters();
     }
@@ -72,7 +75,7 @@ class AIPlayer {
                 const building = new Building(tx, ty, 'enemy', type);
                 this.game.addEntity(building);
                 this.game.map.setOccupied(tx, ty, def.width, def.height, building.id);
-                this.game.map.setBuildingClearance(tx, ty, def.width, def.height, building.id);
+                this.game.map.setBuildingClearance(tx, ty, def.width, def.height, building.id, type);
                 this.game.enemyCredits -= def.cost;
                 this.buildIndex++;
                 this.lastBuildTime = Date.now();
@@ -150,7 +153,7 @@ class AIPlayer {
 
     tryAttack() {
         const combatUnits = this.game.entities.filter(
-            e => e.isUnit && e.owner === 'enemy' && e.type !== 'harvester' && e.state === 'idle'
+            e => e.isUnit && e.owner === 'enemy' && e.type !== 'harvester' && e.type !== 'ornithopter' && e.state === 'idle'
         );
 
         if (combatUnits.length < 5) return;
@@ -171,6 +174,42 @@ class AIPlayer {
         }
 
         this.lastAttackTime = Date.now();
+    }
+
+    tryAirStrike() {
+        // Find idle ornithopters with ammo
+        const ornithopters = this.game.entities.filter(
+            e => e.isUnit && e.owner === 'enemy' && e.type === 'ornithopter' &&
+                 (e.state === 'idle' || e.state === 'patrolling') &&
+                 (e.gunAmmo > 0 || e.missileAmmo > 0)
+        );
+        if (ornithopters.length === 0) return;
+
+        // Find player buildings and units to attack
+        const playerTargets = this.game.entities.filter(e => e.owner === 'player' && e.hp > 0);
+        if (playerTargets.length === 0) return;
+
+        // Prioritize: buildings first (turrets, then production, then others)
+        const turrets = playerTargets.filter(e => e.type === 'turret' || e.type === 'rocket_turret');
+        const buildings = playerTargets.filter(e => e.isBuilding && e.type !== 'turret' && e.type !== 'rocket_turret');
+        const units = playerTargets.filter(e => e.isUnit);
+
+        for (const orni of ornithopters) {
+            // Pick a target — prioritize turrets, then buildings, then units
+            let target;
+            if (turrets.length > 0) {
+                target = turrets[Math.floor(Math.random() * turrets.length)];
+            } else if (buildings.length > 0) {
+                target = buildings[Math.floor(Math.random() * buildings.length)];
+            } else if (units.length > 0) {
+                target = units[Math.floor(Math.random() * units.length)];
+            }
+            if (!target) continue;
+
+            // Send ornithopter to attack
+            orni.target = target;
+            orni.state = 'attacking';
+        }
     }
 
     manageHarvesters() {
