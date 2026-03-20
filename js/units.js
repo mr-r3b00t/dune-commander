@@ -27,7 +27,7 @@ class Unit extends Entity {
         this.turretDirection = Math.PI; // independent turret facing (for tanks)
         this.turretTargetDir = Math.PI;
         // Turn speed varies by unit type (infantry fast, heavy tanks slow)
-        const isInfantry = (type === 'light_infantry' || type === 'heavy_trooper');
+        const isInfantry = (type === 'light_infantry' || type === 'heavy_trooper' || type === 'rocket_infantry' || type === 'commando');
         const isHeavy = (type === 'siege_tank' || type === 'harvester' || type === 'mcv');
         this.turnSpeed = isInfantry ? 10 : isHeavy ? 4 : 6; // radians per second (body)
         this.turretTurnSpeed = 8; // turret rotates faster than body
@@ -584,6 +584,8 @@ class Unit extends Entity {
         switch (this.type) {
             case 'light_infantry': return 'shoot_rifle';
             case 'heavy_trooper': return 'shoot_rocket';
+            case 'rocket_infantry': return 'shoot_rocket';
+            case 'commando': return 'shoot_cannon';
             case 'trike': return 'shoot_machinegun';
             case 'quad': return 'shoot_machinegun';
             case 'tank':
@@ -638,11 +640,26 @@ class Unit extends Entity {
             case 'mcv':
                 SpriteRenderer.drawMCV(ctx, screenX, screenY, this.direction, colors);
                 break;
+            case 'rocket_infantry':
+                SpriteRenderer.drawRocketInfantry(ctx, screenX, screenY, this.direction, colors);
+                break;
+            case 'commando':
+                SpriteRenderer.drawCommando(ctx, screenX, screenY, this.direction, colors);
+                break;
             default:
                 // Fallback for any unknown unit types
                 ctx.fillStyle = colors.primary;
                 ctx.fillRect(screenX - size / 2, screenY - size / 2, size, size);
                 break;
+        }
+
+        // Damage overlay - infantry get blood/wounds, vehicles get fire/smoke
+        const hpRatio = this.hp / this.maxHp;
+        const isInfantryType = (this.type === 'light_infantry' || this.type === 'heavy_trooper' || this.type === 'rocket_infantry' || this.type === 'commando');
+        if (isInfantryType) {
+            SpriteRenderer._infantryDamageOverlay(ctx, screenX, screenY, size, size, hpRatio);
+        } else {
+            SpriteRenderer._damageOverlay(ctx, screenX, screenY, size, size, hpRatio);
         }
 
         // Selection circle

@@ -377,7 +377,7 @@ class GameMap {
         // Terrain edge blending pass: dither borders between different terrain types
         // Work on a copy so we read original values while writing blended ones
         const blended = new Uint8ClampedArray(pixels);
-        const blendRadius = 12; // pixels into each tile to blend
+        const blendRadius = 18; // pixels into each tile to blend (wider = smoother transitions)
 
         for (let ty = 0; ty < MAP_HEIGHT; ty++) {
             for (let tx = 0; tx < MAP_WIDTH; tx++) {
@@ -434,10 +434,10 @@ class GameMap {
 
                             // Smooth hermite interpolation instead of linear
                             const t = 1.0 - (edgeDist / blendRadius);
-                            const smooth = t * t * (3 - 2 * t); // smoothstep
+                            const smooth = t * t * t * (t * (t * 6 - 15) + 10); // smoother quintic interpolation
                             // Add noise-based dithering for natural look
-                            const dither = (simpleNoise(worldPx2, worldPy2, 9999 + nb.dx * 7 + nb.dy * 13) - 0.5) * 0.3;
-                            const factor = clamp(smooth * 0.55 + dither * smooth, 0, 0.6);
+                            const dither = (simpleNoise(worldPx2, worldPy2, 9999 + nb.dx * 7 + nb.dy * 13) - 0.5) * 0.25;
+                            const factor = clamp(smooth * 0.65 + dither * smooth, 0, 0.7);
 
                             if (factor > bestFactor) {
                                 bestFactor = factor;
@@ -589,7 +589,7 @@ class GameMap {
 
         // Blending pass for the dirty region
         const blended = new Uint8ClampedArray(pixels);
-        const blendRadius = 12;
+        const blendRadius = 18;
 
         for (let ty = minTY; ty <= maxTY; ty++) {
             for (let tx = minTX; tx <= maxTX; tx++) {
@@ -636,9 +636,9 @@ class GameMap {
                             if (edgeDist >= blendRadius) continue;
 
                             const t = 1.0 - (edgeDist / blendRadius);
-                            const smooth = t * t * (3 - 2 * t);
-                            const dither = (simpleNoise(worldPx2, worldPy2, 9999 + nb.dx * 7 + nb.dy * 13) - 0.5) * 0.3;
-                            const factor = clamp(smooth * 0.55 + dither * smooth, 0, 0.6);
+                            const smooth = t * t * t * (t * (t * 6 - 15) + 10); // quintic
+                            const dither = (simpleNoise(worldPx2, worldPy2, 9999 + nb.dx * 7 + nb.dy * 13) - 0.5) * 0.25;
+                            const factor = clamp(smooth * 0.65 + dither * smooth, 0, 0.7);
 
                             if (factor > bestFactor) {
                                 bestFactor = factor;

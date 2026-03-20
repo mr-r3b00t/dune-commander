@@ -382,6 +382,12 @@ class Building extends Entity {
                 break;
         }
 
+        // Damage overlay (phased: cracks → fire → smoke)
+        if (!this.isConstructing) {
+            const hpRatio = this.hp / this.maxHp;
+            SpriteRenderer._damageOverlay(ctx, screenX, screenY, w, h, hpRatio);
+        }
+
         // Construction progress overlay
         if (this.isConstructing) {
             ctx.fillStyle = `rgba(0, 0, 0, ${0.7 * (1 - this.constructionProgress)})`;

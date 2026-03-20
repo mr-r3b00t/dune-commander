@@ -24,9 +24,12 @@ class Game {
         this.spiceStored = 0;
         this.enemyCredits = 1500;
         this.running = true;
+        this.paused = false;
         this.deltaTime = 0;
         this.lastTime = 0;
         this.gameOver = false;
+        this.lastAutoSave = 0;
+        this.autoSaveInterval = 30000; // autosave every 30 seconds
 
         // Camera
         this.camera = {
@@ -194,6 +197,22 @@ class Game {
             if (e.key === 'm' || e.key === 'M') {
                 const playing = this.audio.toggleMusic();
                 this.ui.showStatus(playing ? '🎵 Music ON' : '🔇 Music OFF');
+            }
+            if (e.key === 'p' || e.key === 'P') {
+                this.togglePause();
+            }
+            if (e.key === 'F5') {
+                e.preventDefault();
+                this.saveGame();
+                this.ui.showStatus('💾 Game saved!');
+            }
+            if (e.key === 'F9') {
+                e.preventDefault();
+                if (this.loadGame()) {
+                    this.ui.showStatus('📂 Game loaded!');
+                } else {
+                    this.ui.showStatus('No saved game found');
+                }
             }
         });
 
@@ -471,12 +490,13 @@ class Game {
     }
 
     updateCamera() {
-        const edge = 20;
-        const mouseScroll = this.mouse.onCanvas !== false; // only edge-scroll when mouse is on canvas
+        const edge = 15;
+        const rightEdge = 40; // larger dead zone on right side near sidebar
+        const mouseScroll = this.mouse.onCanvas === true; // only edge-scroll when mouse is confirmed on canvas
         if ((mouseScroll && this.mouse.x < edge) || this.keys['arrowleft'] || this.keys['a']) {
             this.camera.x -= this.scrollSpeed;
         }
-        if ((mouseScroll && this.mouse.x > this.canvas.width - edge) || this.keys['arrowright'] || this.keys['d']) {
+        if ((mouseScroll && this.mouse.x > this.canvas.width - rightEdge) || this.keys['arrowright'] || this.keys['d']) {
             this.camera.x += this.scrollSpeed;
         }
         if ((mouseScroll && this.mouse.y < edge) || this.keys['arrowup'] || this.keys['w']) {
@@ -867,6 +887,13 @@ class Game {
         if (Math.floor(timestamp / 1000) !== Math.floor((timestamp - this.deltaTime) / 1000)) {
             this.ui.updateBuildList();
         }
+
+        // Autosave
+        const now = Date.now();
+        if (now - this.lastAutoSave > this.autoSaveInterval) {
+            this.lastAutoSave = now;
+            this.saveGame();
+        }
     }
 
     render() {
@@ -970,6 +997,20 @@ class Game {
         // Status message
         this.ui.renderStatusMessage(ctx, this.canvas.width, this.canvas.height);
 
+        // Pause overlay
+        if (this.paused) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            ctx.fillStyle = '#e0a030';
+            ctx.font = 'bold 48px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('PAUSED', this.canvas.width / 2, this.canvas.height / 2 - 20);
+            ctx.font = '16px monospace';
+            ctx.fillStyle = '#ccc';
+            ctx.fillText('Press P to resume', this.canvas.width / 2, this.canvas.height / 2 + 20);
+            ctx.fillText('F5 = Save  |  F9 = Load', this.canvas.width / 2, this.canvas.height / 2 + 45);
+        }
+
         // End screen shake
         if (shake > 0.5) {
             ctx.restore();
@@ -989,9 +1030,25 @@ class Game {
                entity.y < this.camera.y + this.camera.height + margin;
     }
 
+    togglePause() {
+        this.paused = !this.paused;
+        if (this.paused) {
+            this.ui.showStatus('⏸ PAUSED - Press P to resume');
+            this.audio.speak('Game paused');
+        } else {
+            this.lastTime = performance.now(); // reset delta so no huge jump
+            this.ui.showStatus('▶ RESUMED');
+            this.audio.speak('Game resumed');
+        }
+    }
+
     gameLoop(timestamp) {
         if (!this.running) return;
-        this.update(timestamp);
+        if (!this.paused) {
+            this.update(timestamp);
+        } else {
+            this.lastTime = timestamp; // keep lastTime current so no spike on unpause
+        }
         this.render();
         requestAnimationFrame((t) => this.gameLoop(t));
     }
@@ -1001,5 +1058,173 @@ class Game {
         requestAnimationFrame((t) => this.gameLoop(t));
         // Start background music immediately (called from user click context)
         this.audio.startMusic();
+    }
+
+    // ---- SAVE / LOAD ----
+
+    saveGame() {
+        try {
+            const state = {
+                version: 2,
+                playerHouse: this.playerHouse,
+                enemyHouse: this.enemyHouse,
+                credits: this.credits,
+                spiceStored: this.spiceStored,
+                enemyCredits: this.enemyCredits,
+                gameOver: this.gameOver,
+                camera: { x: this.camera.x, y: this.camera.y },
+                gameStartTime: this.gameStartTime,
+                lastWormSpawn: this.lastWormSpawn,
+                lastFremenSpawn: this.lastFremenSpawn,
+                lastSardaukarSpawn: this.lastSardaukarSpawn,
+                map: {
+                    tiles: this.map.tiles,
+                    spiceAmount: this.map.spiceAmount
+                },
+                entities: this.entities.map(e => this._serializeEntity(e)),
+                sandworms: this.sandworms.map(w => ({
+                    x: w.x, y: w.y, tx: w.tx, ty: w.ty,
+                    targetX: w.targetX, targetY: w.targetY,
+                    speed: w.speed, alive: w.alive, spawnTime: w.spawnTime
+                })),
+                aiState: {
+                    buildIndex: this.ai.buildIndex,
+                    unitBuildIndex: this.ai.unitBuildIndex,
+                    lastBuildTime: this.ai.lastBuildTime,
+                    lastAttackTime: this.ai.lastAttackTime
+                }
+            };
+            localStorage.setItem('dune_commander_save', JSON.stringify(state));
+            return true;
+        } catch (e) {
+            console.warn('Save failed:', e);
+            return false;
+        }
+    }
+
+    _serializeEntity(e) {
+        const data = {
+            cls: e.isBuilding ? 'building' : 'unit',
+            type: e.type,
+            tx: e.tx,
+            ty: e.ty,
+            owner: e.owner,
+            hp: e.hp,
+            id: e.id
+        };
+
+        if (e.isUnit) {
+            data.state = e.state;
+            data.direction = e.direction;
+            data.targetDirection = e.targetDirection;
+            data.turretDirection = e.turretDirection || e.direction;
+            data.spiceCarried = e.spiceCarried || 0;
+            data.moving = e.moving;
+            data.targetTX = e.targetTX;
+            data.targetTY = e.targetTY;
+        }
+
+        if (e.isBuilding) {
+            data.isConstructing = e.isConstructing;
+            data.constructionProgress = e.constructionProgress;
+            data.repairing = e.repairing;
+            data.buildQueue = e.buildQueue.map(q => ({ type: q.type, buildTime: q.buildTime }));
+            data.buildProgress = e.buildProgress;
+            if (e.currentBuild) {
+                data.currentBuild = { type: e.currentBuild.type, buildTime: e.currentBuild.buildTime };
+            }
+        }
+
+        return data;
+    }
+
+    loadGame() {
+        try {
+            const json = localStorage.getItem('dune_commander_save');
+            if (!json) return false;
+            const state = JSON.parse(json);
+            if (!state || !state.version) return false;
+
+            // Restore basic game state
+            this.credits = state.credits;
+            this.spiceStored = state.spiceStored;
+            this.enemyCredits = state.enemyCredits;
+            this.gameOver = state.gameOver;
+            this.camera.x = state.camera.x;
+            this.camera.y = state.camera.y;
+            this.gameStartTime = state.gameStartTime;
+            this.lastWormSpawn = state.lastWormSpawn;
+            this.lastFremenSpawn = state.lastFremenSpawn;
+            this.lastSardaukarSpawn = state.lastSardaukarSpawn;
+
+            // Restore map
+            this.map.tiles = state.map.tiles;
+            this.map.spiceAmount = state.map.spiceAmount;
+            this.map._terrainCacheDirty = true; // force terrain redraw
+
+            // Clear occupied grid
+            for (let y = 0; y < MAP_HEIGHT; y++) {
+                for (let x = 0; x < MAP_WIDTH; x++) {
+                    this.map.occupied[y][x] = null;
+                }
+            }
+
+            // Restore entities
+            this.entities = [];
+            this.projectiles = [];
+            for (const data of state.entities) {
+                let entity;
+                if (data.cls === 'building') {
+                    entity = new Building(data.tx, data.ty, data.owner, data.type);
+                    entity.isConstructing = data.isConstructing;
+                    entity.constructionProgress = data.constructionProgress;
+                    entity.repairing = data.repairing;
+                    entity.buildQueue = data.buildQueue || [];
+                    entity.buildProgress = data.buildProgress || 0;
+                    if (data.currentBuild) {
+                        entity.currentBuild = data.currentBuild;
+                    }
+                    this.map.setOccupied(data.tx, data.ty, entity.width, entity.height, entity.id);
+                } else {
+                    entity = new Unit(data.tx, data.ty, data.owner, data.type);
+                    entity.state = data.state;
+                    entity.direction = data.direction;
+                    entity.targetDirection = data.targetDirection;
+                    entity.turretDirection = data.turretDirection;
+                    entity.spiceCarried = data.spiceCarried;
+                    entity.moving = data.moving || false;
+                    entity.targetTX = data.targetTX;
+                    entity.targetTY = data.targetTY;
+                    if (this.map.occupied[entity.ty]) {
+                        this.map.occupied[entity.ty][entity.tx] = entity.id;
+                    }
+                }
+                entity.hp = data.hp;
+                entity.id = data.id;
+                this.entities.push(entity);
+            }
+
+            // Restore sandworms
+            this.sandworms = state.sandworms || [];
+
+            // Restore AI state
+            if (state.aiState) {
+                this.ai.buildIndex = state.aiState.buildIndex;
+                this.ai.unitBuildIndex = state.aiState.unitBuildIndex;
+                this.ai.lastBuildTime = state.aiState.lastBuildTime;
+                this.ai.lastAttackTime = state.aiState.lastAttackTime;
+            }
+
+            // Force UI refresh
+            this.ui.updateBuildList();
+            this.ui.updateResourceDisplay();
+            this.ui.updateSelectionInfo();
+            this.clampCamera();
+
+            return true;
+        } catch (e) {
+            console.warn('Load failed:', e);
+            return false;
+        }
     }
 }

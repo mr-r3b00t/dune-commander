@@ -87,10 +87,24 @@ class UIManager {
                 const hasFactory = this.game.entities.some(
                     e => e.type === def.buildAt && e.owner === 'player'
                 );
-                const canBuild = available && affordable && hasFactory;
+                // Check unique unit limit
+                let atUniqueLimit = false;
+                if (def.unique) {
+                    const exists = this.game.entities.some(
+                        e => e.type === key && e.owner === 'player' && e.hp > 0
+                    );
+                    const inQueue = this.game.entities.some(
+                        e => e.isBuilding && e.owner === 'player' && e.buildQueue &&
+                            e.buildQueue.some(q => q.type === key)
+                    );
+                    atUniqueLimit = exists || inQueue;
+                }
+                const canBuild = available && affordable && hasFactory && !atUniqueLimit;
 
                 let statusText = `${def.cost} credits`;
-                if (!hasFactory && available) {
+                if (atUniqueLimit) {
+                    statusText = `LIMIT REACHED (1 max)`;
+                } else if (!hasFactory && available) {
                     const factoryDef = BUILDING_DEFS[def.buildAt];
                     statusText = `Needs: ${factoryDef ? factoryDef.name : def.buildAt}`;
                 } else if (!available) {
@@ -148,6 +162,23 @@ class UIManager {
             e => e.type === def.buildAt && e.owner === 'player'
         );
 
+        // Unique unit check (e.g. commando - only 1 allowed)
+        if (def.unique) {
+            const existing = this.game.entities.some(
+                e => e.type === unitType && e.owner === 'player' && e.hp > 0
+            );
+            // Also check build queues
+            const inQueue = this.game.entities.some(
+                e => e.isBuilding && e.owner === 'player' && e.buildQueue &&
+                    e.buildQueue.some(q => q.type === unitType)
+            );
+            if (existing || inQueue) {
+                this.showStatus(`Only one ${def.name} allowed at a time!`);
+                this.game.audio.speak('Cannot comply');
+                return;
+            }
+        }
+
         if (factory && this.game.credits >= def.cost) {
             factory.queueUnit(unitType);
             this.game.credits -= def.cost;
@@ -176,14 +207,19 @@ class UIManager {
             return false;
         }
 
-        // Must build near existing buildings
+        // Must build within 5 tiles of an existing building's boundary
         const nearExisting = this.game.entities.some(e => {
             if (!e.isBuilding || e.owner !== 'player') return false;
-            const dist = tileDistance(
-                tx + Math.floor(def.width / 2), ty + Math.floor(def.height / 2),
-                e.tx + Math.floor(e.width / 2), e.ty + Math.floor(e.height / 2)
-            );
-            return dist <= 8;
+            // Calculate distance between closest edges of the two buildings
+            const newLeft = tx, newRight = tx + def.width - 1;
+            const newTop = ty, newBottom = ty + def.height - 1;
+            const exLeft = e.tx, exRight = e.tx + e.width - 1;
+            const exTop = e.ty, exBottom = e.ty + e.height - 1;
+            // Axis-aligned gap between rectangles
+            const gapX = Math.max(0, newLeft - exRight - 1, exLeft - newRight - 1);
+            const gapY = Math.max(0, newTop - exBottom - 1, exTop - newBottom - 1);
+            const edgeDist = Math.max(gapX, gapY);
+            return edgeDist <= 5;
         });
 
         if (!nearExisting) {
@@ -256,11 +292,14 @@ class UIManager {
         const canBuild = this.game.map.canBuildAt(tx, ty, def.width, def.height);
         const nearExisting = this.game.entities.some(e => {
             if (!e.isBuilding || e.owner !== 'player') return false;
-            const dist = tileDistance(
-                tx + Math.floor(def.width / 2), ty + Math.floor(def.height / 2),
-                e.tx + Math.floor(e.width / 2), e.ty + Math.floor(e.height / 2)
-            );
-            return dist <= 8;
+            const newLeft = tx, newRight = tx + def.width - 1;
+            const newTop = ty, newBottom = ty + def.height - 1;
+            const exLeft = e.tx, exRight = e.tx + e.width - 1;
+            const exTop = e.ty, exBottom = e.ty + e.height - 1;
+            const gapX = Math.max(0, newLeft - exRight - 1, exLeft - newRight - 1);
+            const gapY = Math.max(0, newTop - exBottom - 1, exTop - newBottom - 1);
+            const edgeDist = Math.max(gapX, gapY);
+            return edgeDist <= 5;
         });
 
         const valid = canBuild && nearExisting;

@@ -16,7 +16,16 @@ const SpriteRenderer = {
     // ---- UTILITY HELPERS ----
 
     // Darken a hex color by a factor (0-1)
+    _expandHex(hex) {
+        // Expand 3-digit hex (#rgb) to 6-digit (#rrggbb)
+        if (hex.length === 4) {
+            return '#' + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3];
+        }
+        return hex;
+    },
+
     _darken(hex, factor) {
+        hex = this._expandHex(hex);
         const r = parseInt(hex.slice(1, 3), 16);
         const g = parseInt(hex.slice(3, 5), 16);
         const b = parseInt(hex.slice(5, 7), 16);
@@ -25,6 +34,7 @@ const SpriteRenderer = {
 
     // Parse hex to RGB array
     _hexToRgb(hex) {
+        hex = this._expandHex(hex);
         return [
             parseInt(hex.slice(1, 3), 16),
             parseInt(hex.slice(3, 5), 16),
@@ -34,6 +44,7 @@ const SpriteRenderer = {
 
     // Lighten a hex color by a factor (0-1)
     _lighten(hex, factor) {
+        hex = this._expandHex(hex);
         const r = parseInt(hex.slice(1, 3), 16);
         const g = parseInt(hex.slice(3, 5), 16);
         const b = parseInt(hex.slice(5, 7), 16);
@@ -240,54 +251,229 @@ const SpriteRenderer = {
 
     // Damage overlay (cracks and fire) based on hp ratio
     _damageOverlay(ctx, cx, cy, dw, dh, hpRatio) {
-        if (hpRatio === undefined || hpRatio >= 0.7) return;
+        if (hpRatio === undefined || hpRatio >= 0.85) return;
         ctx.save();
         const hw = dw / 2, hh = dh / 2;
+        const t = Date.now();
 
-        // Cracks
-        if (hpRatio < 0.7) {
-            ctx.strokeStyle = 'rgba(40,20,0,0.5)';
-            ctx.lineWidth = 1;
-            const crackCount = hpRatio < 0.3 ? 4 : 2;
-            for (let i = 0; i < crackCount; i++) {
-                const sx = cx - hw * 0.5 + (i * dw * 0.3);
-                const sy = cy - hh * 0.3;
+        // Phase 1: Light damage (85-60%) - hull dents, paint scratches
+        if (hpRatio < 0.85) {
+            const severity = (0.85 - hpRatio) * 1.5;
+
+            // Dent marks on hull (dark spots)
+            ctx.fillStyle = `rgba(20,15,10,${Math.min(severity * 0.3, 0.3)})`;
+            ctx.beginPath();
+            ctx.ellipse(cx + hw * 0.2, cy - hh * 0.15, dw * 0.08, dh * 0.06, 0.3, 0, Math.PI * 2);
+            ctx.fill();
+            if (hpRatio < 0.75) {
                 ctx.beginPath();
-                ctx.moveTo(sx, sy);
-                ctx.lineTo(sx + 5, sy + 8);
-                ctx.lineTo(sx + 2, sy + 14);
-                ctx.lineTo(sx + 7, sy + 20);
+                ctx.ellipse(cx - hw * 0.25, cy + hh * 0.1, dw * 0.07, dh * 0.05, -0.4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Paint scratches on armor
+            ctx.strokeStyle = `rgba(60,50,40,${Math.min(severity * 0.4, 0.4)})`;
+            ctx.lineWidth = 0.7;
+            ctx.beginPath();
+            ctx.moveTo(cx - hw * 0.3, cy - hh * 0.2);
+            ctx.lineTo(cx + hw * 0.1, cy - hh * 0.05);
+            ctx.stroke();
+            if (hpRatio < 0.7) {
+                ctx.beginPath();
+                ctx.moveTo(cx + hw * 0.15, cy + hh * 0.1);
+                ctx.lineTo(cx - hw * 0.1, cy + hh * 0.25);
                 ctx.stroke();
             }
         }
 
-        // Fire for heavy damage
-        if (hpRatio < 0.4) {
-            const t = Date.now();
-            const fireCount = hpRatio < 0.2 ? 3 : 1;
-            for (let i = 0; i < fireCount; i++) {
-                const fx = cx + (i - 1) * dw * 0.25;
-                const fy = cy - hh * 0.4;
-                const flicker = Math.sin(t / 60 + i * 2) * 3;
-                const fsize = (1 - hpRatio) * 8 + 4;
+        // Phase 2: Moderate damage (60-30%) - sparks from chassis, thin smoke from engine
+        if (hpRatio < 0.6) {
+            const modSeverity = (0.6 - hpRatio) * 1.5;
 
-                const fireGrad = ctx.createRadialGradient(fx, fy + flicker, 0, fx, fy + flicker, fsize);
-                fireGrad.addColorStop(0, 'rgba(255,255,200,0.8)');
-                fireGrad.addColorStop(0.3, 'rgba(255,160,30,0.6)');
-                fireGrad.addColorStop(0.6, 'rgba(255,60,10,0.3)');
-                fireGrad.addColorStop(1, 'rgba(80,20,0,0)');
-                ctx.fillStyle = fireGrad;
+            // Sparks flying from damaged hull
+            if (Math.sin(t / 150) > 0.7) {
+                ctx.strokeStyle = `rgba(255,230,100,${0.4 + Math.random() * 0.3})`;
+                ctx.lineWidth = 0.6;
+                const sparkX = cx + Math.sin(t / 90) * hw * 0.25;
+                const sparkY = cy + Math.cos(t / 70) * hh * 0.15;
                 ctx.beginPath();
-                ctx.ellipse(fx, fy + flicker, fsize * 0.7, fsize, 0, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.moveTo(sparkX, sparkY);
+                for (let j = 0; j < 3; j++) {
+                    ctx.lineTo(sparkX + (Math.random() - 0.5) * 5, sparkY + (Math.random() - 0.5) * 5);
+                }
+                ctx.stroke();
+            }
 
-                // Smoke
-                ctx.fillStyle = `rgba(60,50,40,${0.15 + Math.sin(t / 200 + i) * 0.05})`;
+            // Thin engine smoke rising from top of vehicle body
+            const smokeAlpha = modSeverity * 0.15;
+            for (let i = 0; i < 2; i++) {
+                const smokeX = cx + (i - 0.5) * dw * 0.2 + Math.sin(t / 400 + i * 3) * 2;
+                const smokeY = cy - hh - 2 - Math.abs(Math.sin(t / 350 + i)) * 4;
+                const smokeR = 2 + modSeverity * 3;
+                ctx.fillStyle = `rgba(80,75,70,${Math.min(smokeAlpha, 0.15)})`;
                 ctx.beginPath();
-                ctx.arc(fx + Math.sin(t / 300 + i) * 3, fy - fsize - 3 + Math.sin(t / 250) * 2, fsize * 0.6, 0, Math.PI * 2);
+                ctx.arc(smokeX, smokeY, smokeR, 0, Math.PI * 2);
                 ctx.fill();
             }
+
+            // Damaged/scorched hull tint
+            ctx.fillStyle = `rgba(30,15,5,${modSeverity * 0.08})`;
+            ctx.fillRect(cx - hw, cy - hh, dw, dh);
         }
+
+        // Phase 3: Heavy damage (30-0%) - engine fire on body, heavy smoke
+        if (hpRatio < 0.3) {
+            const critical = (0.3 - hpRatio) * 2;
+
+            // Small flames coming from the engine/hull (on the vehicle, not below)
+            const fireCount = hpRatio < 0.15 ? 2 : 1;
+            for (let i = 0; i < fireCount; i++) {
+                const fx = cx + (i - (fireCount - 1) / 2) * dw * 0.2;
+                const fy = cy - hh * 0.2;
+                const flicker = Math.sin(t / 60 + i * 2.3) * 2;
+                const fsize = 3 + critical * 5;
+
+                // Fire on hull
+                const fireGrad = ctx.createRadialGradient(fx, fy + flicker, 0, fx, fy + flicker, fsize);
+                fireGrad.addColorStop(0, 'rgba(255,255,200,0.7)');
+                fireGrad.addColorStop(0.3, 'rgba(255,160,30,0.5)');
+                fireGrad.addColorStop(0.6, 'rgba(255,60,10,0.25)');
+                fireGrad.addColorStop(1, 'rgba(100,20,0,0)');
+                ctx.fillStyle = fireGrad;
+                ctx.beginPath();
+                ctx.ellipse(fx, fy + flicker, fsize * 0.5, fsize * 0.7, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Smoke rising from the vehicle top
+            for (let s = 0; s < 2; s++) {
+                const sAge = (t / 350 + s * 1.8) % 2.5;
+                const sX = cx + Math.sin(t / 280 + s) * hw * 0.2;
+                const sY = cy - hh - 3 - sAge * 6;
+                const sR = 2 + sAge * 3;
+                const sAlpha = Math.max(0, 0.2 - sAge * 0.07);
+                ctx.fillStyle = `rgba(50,45,40,${sAlpha})`;
+                ctx.beginPath();
+                ctx.arc(sX, sY, sR, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Charred/blackened hull overlay
+            ctx.fillStyle = `rgba(20,10,0,${critical * 0.15})`;
+            ctx.fillRect(cx - hw, cy - hh, dw, dh);
+        }
+
+        ctx.restore();
+    },
+
+    // Infantry-specific damage overlay: blood splatters, wounds, limping effects
+    _infantryDamageOverlay(ctx, cx, cy, dw, dh, hpRatio) {
+        if (hpRatio === undefined || hpRatio >= 0.85) return;
+        ctx.save();
+        const hw = dw / 2, hh = dh / 2;
+        const t = Date.now();
+
+        // Phase 1: Light injury (85-60%) - small blood spatters, scuffs
+        if (hpRatio < 0.85) {
+            const severity = (0.85 - hpRatio) * 2;
+
+            // Blood spatter dots
+            ctx.fillStyle = `rgba(140,15,10,${Math.min(severity * 0.4, 0.5)})`;
+            ctx.beginPath();
+            ctx.arc(cx + hw * 0.25, cy - hh * 0.15, 1.2, 0, Math.PI * 2);
+            ctx.fill();
+            if (hpRatio < 0.75) {
+                ctx.beginPath();
+                ctx.arc(cx - hw * 0.2, cy + hh * 0.1, 1.0, 0, Math.PI * 2);
+                ctx.fill();
+                // Torn uniform scuff
+                ctx.strokeStyle = `rgba(60,30,15,${severity * 0.3})`;
+                ctx.lineWidth = 0.6;
+                ctx.beginPath();
+                ctx.moveTo(cx - hw * 0.1, cy - hh * 0.3);
+                ctx.lineTo(cx + hw * 0.15, cy - hh * 0.15);
+                ctx.stroke();
+            }
+        }
+
+        // Phase 2: Moderate injury (60-30%) - visible wounds, blood drips, limping tint
+        if (hpRatio < 0.6) {
+            const woundAlpha = (0.6 - hpRatio) * 1.2;
+
+            // Larger blood patches on body
+            ctx.fillStyle = `rgba(130,10,5,${Math.min(woundAlpha * 0.35, 0.4)})`;
+            ctx.beginPath();
+            ctx.ellipse(cx + hw * 0.15, cy - hh * 0.05, 2.5, 1.8, 0.4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(cx - hw * 0.25, cy + hh * 0.2, 2, 1.5, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Blood drip trail
+            ctx.strokeStyle = `rgba(120,5,0,${Math.min(woundAlpha * 0.3, 0.35)})`;
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            ctx.moveTo(cx + hw * 0.15, cy + hh * 0.1);
+            ctx.quadraticCurveTo(cx + hw * 0.1, cy + hh * 0.35, cx + hw * 0.2, cy + hh * 0.55);
+            ctx.stroke();
+
+            // Wound gashes
+            ctx.strokeStyle = `rgba(100,0,0,${Math.min(woundAlpha * 0.5, 0.5)})`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(cx - hw * 0.3, cy - hh * 0.25);
+            ctx.lineTo(cx - hw * 0.1, cy - hh * 0.1);
+            ctx.stroke();
+
+            // Pained reddish tint (slight flush)
+            const flush = Math.sin(t / 800) * 0.03 + 0.06;
+            ctx.fillStyle = `rgba(150,20,10,${flush * woundAlpha})`;
+            ctx.fillRect(cx - hw, cy - hh, dw, dh);
+        }
+
+        // Phase 3: Critical injury (30-0%) - heavy bleeding, staggering, blood pool
+        if (hpRatio < 0.3) {
+            const critical = (0.3 - hpRatio) * 2;
+
+            // Blood pool forming on ground beneath
+            const poolSize = 3 + critical * 6;
+            const poolAlpha = Math.min(critical * 0.25, 0.35);
+            const poolGrad = ctx.createRadialGradient(cx, cy + hh * 0.5, 0, cx, cy + hh * 0.5, poolSize);
+            poolGrad.addColorStop(0, `rgba(100,5,0,${poolAlpha})`);
+            poolGrad.addColorStop(0.6, `rgba(80,0,0,${poolAlpha * 0.6})`);
+            poolGrad.addColorStop(1, 'rgba(60,0,0,0)');
+            ctx.fillStyle = poolGrad;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy + hh * 0.5, poolSize * 1.2, poolSize * 0.7, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Multiple heavy blood splatters
+            const splatCount = hpRatio < 0.15 ? 4 : 2;
+            for (let i = 0; i < splatCount; i++) {
+                const sx = cx + Math.sin(i * 2.1 + 0.5) * hw * 0.4;
+                const sy = cy + Math.cos(i * 1.7 + 0.3) * hh * 0.3;
+                ctx.fillStyle = `rgba(110,5,0,${Math.min(critical * 0.3, 0.4)})`;
+                ctx.beginPath();
+                ctx.arc(sx, sy, 1.5 + critical * 1.5, 0, Math.PI * 2);
+                ctx.fill();
+                // Splatter drops radiating out
+                ctx.fillStyle = `rgba(100,0,0,${Math.min(critical * 0.25, 0.3)})`;
+                for (let d = 0; d < 3; d++) {
+                    const angle = (i * 2 + d * 2.1);
+                    const dist = 2 + critical * 2;
+                    ctx.beginPath();
+                    ctx.arc(sx + Math.cos(angle) * dist, sy + Math.sin(angle) * dist, 0.6, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Staggering visual - slight body sway
+            const stagger = Math.sin(t / 300) * critical * 0.5;
+            // Red vignette overlay (fading/weakening)
+            ctx.fillStyle = `rgba(80,0,0,${critical * 0.12 + stagger * 0.02})`;
+            ctx.fillRect(cx - hw, cy - hh, dw, dh);
+        }
+
         ctx.restore();
     },
 
@@ -563,6 +749,323 @@ const SpriteRenderer = {
             ctx.fillRect(-0.3, 0, 2, 2);
             ctx.restore();
         }
+
+        ctx.restore();
+    },
+
+    drawRocketInfantry(ctx, x, y, dir, colors) {
+        ctx.save();
+        ctx.translate(x, y);
+
+        // Shadow + ground contact
+        this._unitShadow(ctx, 0, 4, 7, 4);
+        this._groundContact(ctx, 0, 3, 6, 3);
+
+        const t = Date.now();
+        const walk = Math.sin(t / 160) * 1.8;
+        const breathe = Math.sin(t / 700) * 0.3;
+
+        // Boots - military green/khaki
+        const bootGrad = ctx.createLinearGradient(-3, 0, 3, 6);
+        bootGrad.addColorStop(0, '#4a4430');
+        bootGrad.addColorStop(1, '#2a2618');
+        ctx.fillStyle = bootGrad;
+        ctx.fillRect(-3.5, 0 + walk, 2.5, 5);
+        ctx.fillRect(1, 0 - walk, 2.5, 5);
+        ctx.fillStyle = '#1a1808';
+        ctx.fillRect(-3.5, 4.5 + walk, 2.5, 1);
+        ctx.fillRect(1, 4.5 - walk, 2.5, 1);
+
+        // Kneepads
+        ctx.fillStyle = '#3a3828';
+        ctx.fillRect(-3.5, -0.5 + walk, 2.5, 1.5);
+        ctx.fillRect(1, -0.5 - walk, 2.5, 1.5);
+
+        // Body - slightly lighter armor than heavy trooper
+        this._topDownHull(ctx, 0, -3 + breathe, 10, 8, colors, 2, 0);
+
+        // Chest armor plating with rocket ammo pouches
+        this._panelLine(ctx, -4, -6, -4, 0);
+        this._panelLine(ctx, 4, -6, 4, 0);
+        // Ammo pouches across chest (distinct from heavy trooper)
+        ctx.fillStyle = this._darken(colors.dark, 0.1);
+        ctx.fillRect(-4.5, -5, 2.5, 4);
+        ctx.fillRect(2, -5, 2.5, 4);
+        // Rocket tips visible in pouches
+        ctx.fillStyle = '#cc5533';
+        ctx.fillRect(-3.8, -5, 1, 1);
+        ctx.fillRect(-3.8, -3.5, 1, 1);
+        ctx.fillRect(2.7, -5, 1, 1);
+        ctx.fillRect(2.7, -3.5, 1, 1);
+
+        // Single shoulder pad (launcher side only)
+        ctx.fillStyle = this._darken(colors.primary, 0.2);
+        ctx.fillRect(2.5, -7, 3.5, 3);
+        // Reinforced edge
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(2.5, -7, 3.5, 3);
+
+        this._panelLine(ctx, -3, -2, 3, -2);
+
+        // Belt with grenades
+        ctx.fillStyle = '#3a2a18';
+        ctx.fillRect(-4, -1, 8, 1.5);
+        ctx.fillStyle = 'rgba(255,220,100,0.6)';
+        ctx.fillRect(-0.5, -1, 1, 1.5);
+        // Grenade on belt
+        ctx.fillStyle = '#445533';
+        ctx.beginPath();
+        ctx.arc(-2.5, -0.5, 0.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(2.5, -0.5, 0.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Head with skin
+        const skinGrad = ctx.createRadialGradient(-0.5, -10.5, 0, 0, -10, 4);
+        skinGrad.addColorStop(0, '#e8b888');
+        skinGrad.addColorStop(1, '#c09068');
+        ctx.fillStyle = skinGrad;
+        ctx.beginPath();
+        ctx.arc(0, -10 + breathe, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Helmet with blast visor (different from heavy trooper)
+        const helmetGrad = ctx.createLinearGradient(-3, -14, 3, -9);
+        helmetGrad.addColorStop(0, this._lighten(colors.dark, 0.15));
+        helmetGrad.addColorStop(0.5, colors.dark);
+        helmetGrad.addColorStop(1, this._darken(colors.dark, 0.35));
+        ctx.fillStyle = helmetGrad;
+        ctx.beginPath();
+        ctx.arc(0, -11 + breathe, 3.5, Math.PI * 0.7, Math.PI * 2.3);
+        ctx.fill();
+        // Blast visor (wider, amber tint)
+        const visorGrad = ctx.createLinearGradient(-3, -11.5, 3, -10);
+        visorGrad.addColorStop(0, '#554422');
+        visorGrad.addColorStop(0.4, '#886633');
+        visorGrad.addColorStop(0.7, '#775522');
+        visorGrad.addColorStop(1, 'rgba(200,160,60,0.3)');
+        ctx.fillStyle = visorGrad;
+        ctx.fillRect(-3, -11.5 + breathe, 6, 2.2);
+        // Visor frame
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(-3, -11.5 + breathe, 6, 2.2);
+
+        // Shoulder-mounted rocket launcher (larger, on right shoulder)
+        const wx = Math.sin(dir) * 3;
+        const wy = -Math.cos(dir) * 1.5;
+        ctx.save();
+        ctx.translate(wx + 4, -7 + wy + breathe);
+        ctx.rotate(dir * 0.2);
+
+        // Launcher tube (thick, military olive)
+        const tubeGrad = ctx.createLinearGradient(-2, 0, 2.5, 0);
+        tubeGrad.addColorStop(0, '#556644');
+        tubeGrad.addColorStop(0.3, '#778866');
+        tubeGrad.addColorStop(0.7, '#667755');
+        tubeGrad.addColorStop(1, '#445533');
+        ctx.fillStyle = tubeGrad;
+        ctx.fillRect(-1.8, 2, 3.6, -14);
+
+        // Tube opening (dark bore)
+        ctx.fillStyle = '#1a1a1a';
+        ctx.beginPath();
+        ctx.ellipse(0, -12, 1.5, 0.8, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Sight/optics on top
+        ctx.fillStyle = '#333';
+        ctx.fillRect(-0.8, -8, 1.6, 3);
+        // Sight lens
+        ctx.fillStyle = '#cc3322';
+        ctx.beginPath();
+        ctx.arc(0, -7, 0.7, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Grip/handle
+        ctx.fillStyle = '#3a2a15';
+        ctx.fillRect(-0.5, 0, 1.2, 3);
+
+        // Rear exhaust warning stripes
+        ctx.fillStyle = '#ccaa00';
+        ctx.fillRect(-1.5, 1.5, 3, 0.5);
+        ctx.fillStyle = '#222';
+        ctx.fillRect(-1.5, 1, 3, 0.5);
+
+        // Loaded rocket visible in tube
+        const rocketGlow = Math.sin(t / 400) * 0.2 + 0.8;
+        ctx.fillStyle = `rgba(255,80,20,${rocketGlow * 0.7})`;
+        ctx.beginPath();
+        ctx.ellipse(0, -11.5, 1, 0.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+
+        ctx.restore();
+    },
+
+    drawCommando(ctx, x, y, dir, colors) {
+        ctx.save();
+        ctx.translate(x, y);
+
+        // Shadow + ground contact
+        this._unitShadow(ctx, 0, 4, 8, 4);
+        this._groundContact(ctx, 0, 3, 7, 3);
+
+        const t = Date.now();
+        const walk = Math.sin(t / 120) * 1.5; // faster, more agile stride
+        const breathe = Math.sin(t / 600) * 0.3;
+
+        // Combat boots - dark tactical
+        const bootGrad = ctx.createLinearGradient(-3, 0, 3, 6);
+        bootGrad.addColorStop(0, '#2a2a2a');
+        bootGrad.addColorStop(1, '#111111');
+        ctx.fillStyle = bootGrad;
+        ctx.fillRect(-3.5, 0 + walk, 2.8, 5);
+        ctx.fillRect(0.7, 0 - walk, 2.8, 5);
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(-3.5, 4.5 + walk, 2.8, 1);
+        ctx.fillRect(0.7, 4.5 - walk, 2.8, 1);
+
+        // Tactical body - dark stealth suit
+        const bodyColors = { primary: '#2a2a32', secondary: '#3a3a44', dark: '#1a1a22', light: '#4a4a55' };
+        this._topDownHull(ctx, 0, -3 + breathe, 10, 8, bodyColors, 2, 0);
+
+        // Tactical vest/armor with house color trim
+        ctx.fillStyle = colors.dark;
+        ctx.fillRect(-4.5, -7, 9, 2);
+        ctx.fillStyle = this._darken(colors.primary, 0.2);
+        ctx.fillRect(-3, -6, 6, 3);
+        // Cross-chest ammo belt
+        ctx.strokeStyle = '#3a3020';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-4, -6);
+        ctx.lineTo(3, -2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(4, -6);
+        ctx.lineTo(-3, -2);
+        ctx.stroke();
+        // Ammo pouches on belt
+        ctx.fillStyle = '#2a2018';
+        ctx.fillRect(-4.5, -1, 2, 1.5);
+        ctx.fillRect(2.5, -1, 2, 1.5);
+
+        // Tactical belt
+        ctx.fillStyle = '#222222';
+        ctx.fillRect(-4, -1, 8, 1.5);
+        ctx.fillStyle = 'rgba(200,180,100,0.5)';
+        ctx.fillRect(-0.5, -1, 1, 1.5);
+
+        // Head with balaclava/face paint
+        const skinGrad = ctx.createRadialGradient(-0.5, -10.5, 0, 0, -10, 4);
+        skinGrad.addColorStop(0, '#5a6a4a'); // camo face paint
+        skinGrad.addColorStop(1, '#3a4a2a');
+        ctx.fillStyle = skinGrad;
+        ctx.beginPath();
+        ctx.arc(0, -10 + breathe, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Tactical beret/headgear with house color
+        const beretGrad = ctx.createLinearGradient(-3, -14, 3, -10);
+        beretGrad.addColorStop(0, colors.primary);
+        beretGrad.addColorStop(0.5, this._darken(colors.primary, 0.15));
+        beretGrad.addColorStop(1, this._darken(colors.primary, 0.3));
+        ctx.fillStyle = beretGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, -12.5 + breathe, 4, 2.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Beret badge
+        ctx.fillStyle = 'rgba(255,220,100,0.8)';
+        ctx.beginPath();
+        ctx.arc(0, -12.5 + breathe, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Night-vision goggles on beret (pushed up)
+        ctx.fillStyle = '#333';
+        ctx.fillRect(-3, -13.5 + breathe, 2.5, 1.5);
+        ctx.fillRect(0.5, -13.5 + breathe, 2.5, 1.5);
+        // Green lens glow
+        ctx.save();
+        ctx.shadowColor = '#00ff44';
+        ctx.shadowBlur = 3;
+        ctx.fillStyle = '#00cc33';
+        ctx.fillRect(-2.5, -13 + breathe, 1.5, 0.8);
+        ctx.fillRect(1, -13 + breathe, 1.5, 0.8);
+        ctx.restore();
+
+        // Eyes - intense stare
+        ctx.fillStyle = '#ddddcc';
+        ctx.fillRect(-2, -10.5 + breathe, 1.5, 0.8);
+        ctx.fillRect(0.5, -10.5 + breathe, 1.5, 0.8);
+        ctx.fillStyle = '#111';
+        ctx.fillRect(-1.5, -10.3 + breathe, 0.8, 0.6);
+        ctx.fillRect(0.8, -10.3 + breathe, 0.8, 0.6);
+
+        // Weapon: sniper rifle with scope (longer, more detailed)
+        const wx = Math.sin(dir) * 4;
+        const wy = -Math.cos(dir) * 2;
+        ctx.save();
+        ctx.translate(wx + 3.5, -5 + wy + breathe);
+        ctx.rotate(dir * 0.25);
+        // Rifle body
+        const rifleGrad = ctx.createLinearGradient(-1, 0, 2, 0);
+        rifleGrad.addColorStop(0, '#333');
+        rifleGrad.addColorStop(0.5, '#555');
+        rifleGrad.addColorStop(1, '#2a2a2a');
+        ctx.fillStyle = rifleGrad;
+        ctx.fillRect(-0.5, 2, 2, -14);
+        // Stock
+        ctx.fillStyle = '#3a2a15';
+        ctx.fillRect(-0.8, 2, 2.5, 3);
+        // Scope
+        ctx.fillStyle = '#222';
+        ctx.fillRect(-0.3, -8, 1.5, 4);
+        // Scope lens glint
+        ctx.save();
+        ctx.shadowColor = '#6688ff';
+        ctx.shadowBlur = 2;
+        ctx.fillStyle = '#4466cc';
+        ctx.beginPath();
+        ctx.arc(0.5, -8, 0.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        // Suppressor
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(-0.2, -14, 1.4, 3);
+        ctx.restore();
+
+        // C4/explosives pack on back
+        ctx.fillStyle = '#554422';
+        ctx.fillRect(-4, -4 + breathe, 3, 2.5);
+        ctx.fillStyle = '#cc2222';
+        ctx.fillRect(-3.5, -3.5 + breathe, 0.8, 0.8); // detonator light
+        // Blinking detonator
+        if (Math.sin(t / 500) > 0.5) {
+            ctx.save();
+            ctx.shadowColor = '#ff0000';
+            ctx.shadowBlur = 3;
+            ctx.fillStyle = '#ff3333';
+            ctx.beginPath();
+            ctx.arc(-3.1, -3.1 + breathe, 0.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Rank insignia glow (elite unit indicator)
+        const glowPhase = Math.sin(t / 1000) * 0.3 + 0.7;
+        ctx.save();
+        ctx.globalAlpha = glowPhase * 0.4;
+        ctx.strokeStyle = colors.light;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(0, -3 + breathe, 8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.restore();
 
         ctx.restore();
     },

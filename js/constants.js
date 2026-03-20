@@ -18,11 +18,11 @@ const TERRAIN = {
 
 // Terrain colors
 const TERRAIN_COLORS = {
-    [TERRAIN.SAND]: '#c2a44e',
+    [TERRAIN.SAND]: '#c8a850',
     [TERRAIN.ROCK]: '#8a7a5e',
-    [TERRAIN.DUNES]: '#d4b55a',
-    [TERRAIN.SPICE]: '#e08030',
-    [TERRAIN.THICK_SPICE]: '#d06020',
+    [TERRAIN.DUNES]: '#d0b058',
+    [TERRAIN.SPICE]: '#c49040',
+    [TERRAIN.THICK_SPICE]: '#b07030',
     [TERRAIN.MOUNTAIN]: '#5a4a3a',
     [TERRAIN.CONCRETE]: '#888888'
 };
@@ -269,7 +269,7 @@ const UNIT_DEFS = {
         cost: 400,
         buildTime: 6000,
         hp: 500,
-        speed: 0.8,
+        speed: 0.5,
         attackRange: 0,
         attackDamage: 0,
         attackSpeed: 0,
@@ -333,6 +333,35 @@ const UNIT_DEFS = {
         buildAt: 'heavy_factory',
         requires: ['heavy_factory'],
         description: 'Deploys into a Construction Yard.'
+    },
+    rocket_infantry: {
+        name: 'Rocket Infantry',
+        icon: '🚀',
+        cost: 80,
+        buildTime: 3500,
+        hp: 40,
+        speed: 1.0,
+        attackRange: 5,
+        attackDamage: 18,
+        attackSpeed: 2200,
+        buildAt: 'barracks',
+        requires: ['barracks'],
+        description: 'Anti-vehicle infantry with shoulder-mounted rocket launcher.'
+    },
+    commando: {
+        name: 'Commando',
+        icon: '🎯',
+        cost: 1200,
+        buildTime: 12000,
+        hp: 120,
+        speed: 1.8,
+        attackRange: 6,
+        attackDamage: 40,
+        attackSpeed: 1500,
+        buildAt: 'barracks',
+        requires: ['barracks', 'heavy_factory'],
+        unique: true,
+        description: 'Elite commando. Extremely powerful. Only one allowed at a time.'
     }
 };
 

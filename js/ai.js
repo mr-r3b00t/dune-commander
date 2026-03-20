@@ -12,7 +12,7 @@ class AIPlayer {
             'light_factory', 'refinery', 'heavy_factory', 'turret', 'turret'
         ];
         this.buildIndex = 0;
-        this.unitBuildOrder = ['light_infantry', 'light_infantry', 'trike', 'tank', 'heavy_trooper', 'tank', 'siege_tank'];
+        this.unitBuildOrder = ['light_infantry', 'light_infantry', 'trike', 'rocket_infantry', 'tank', 'heavy_trooper', 'tank', 'siege_tank', 'rocket_infantry', 'commando'];
         this.unitBuildIndex = 0;
     }
 
@@ -56,6 +56,13 @@ class AIPlayer {
             const ty = base.ty + randomInt(-8, 8);
 
             if (this.game.map.canBuildAt(tx, ty, def.width, def.height)) {
+                // Must be within 5 tiles of an existing enemy building boundary
+                const nearOwn = enemyBuildings.some(eb => {
+                    const gapX = Math.max(0, tx - (eb.tx + eb.width - 1) - 1, eb.tx - (tx + def.width - 1) - 1);
+                    const gapY = Math.max(0, ty - (eb.ty + eb.height - 1) - 1, eb.ty - (ty + def.height - 1) - 1);
+                    return Math.max(gapX, gapY) <= 5;
+                });
+                if (!nearOwn) continue;
                 const building = new Building(tx, ty, 'enemy', type);
                 this.game.addEntity(building);
                 this.game.map.setOccupied(tx, ty, def.width, def.height, building.id);
@@ -82,8 +89,17 @@ class AIPlayer {
         const enemyUnits = this.game.entities.filter(e => e.isUnit && e.owner === 'enemy' && e.type !== 'harvester');
         if (enemyUnits.length >= 20) return;
 
-        const unitType = this.unitBuildOrder[this.unitBuildIndex % this.unitBuildOrder.length];
+        let unitType = this.unitBuildOrder[this.unitBuildIndex % this.unitBuildOrder.length];
         const def = UNIT_DEFS[unitType];
+
+        // Unique unit limit for AI too
+        if (def.unique) {
+            const alreadyHas = this.game.entities.some(e => e.type === unitType && e.owner === 'enemy' && e.hp > 0);
+            if (alreadyHas) {
+                this.unitBuildIndex++;
+                return;
+            }
+        }
 
         if (this.game.enemyCredits < def.cost) return;
 
