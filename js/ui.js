@@ -153,6 +153,15 @@ class UIManager {
                     });
                 }
 
+                // Right-click to cancel one from queue
+                if (queuedCount > 0) {
+                    item.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+                        this.cancelQueuedUnit(key);
+                    });
+                    item.title += ' | Right-click to cancel one';
+                }
+
                 list.appendChild(item);
             }
         }
@@ -222,6 +231,69 @@ class UIManager {
         }
     }
 
+    cancelQueuedUnit(unitType) {
+        const def = UNIT_DEFS[unitType];
+
+        // First try to remove from a build queue (not currently building)
+        for (const e of this.game.entities) {
+            if (!e.isBuilding || e.owner !== 'player') continue;
+            if (e.buildQueue) {
+                for (let i = e.buildQueue.length - 1; i >= 0; i--) {
+                    if (e.buildQueue[i].type === unitType) {
+                        e.buildQueue.splice(i, 1);
+                        this.game.credits += def.cost;
+                        this.game.audio.play('click');
+                        this.showStatus(`${def.name} cancelled — ${def.cost} credits refunded`);
+                        this.updateBuildList();
+                        return;
+                    }
+                }
+            }
+        }
+
+        // If nothing in queues, cancel the one currently building
+        for (const e of this.game.entities) {
+            if (!e.isBuilding || e.owner !== 'player') continue;
+            if (e.currentBuild && e.currentBuild.type === unitType) {
+                e.currentBuild = null;
+                e.buildProgress = 0;
+                this.game.credits += def.cost;
+                this.game.audio.play('click');
+                this.showStatus(`${def.name} cancelled — ${def.cost} credits refunded`);
+                this.updateBuildList();
+                return;
+            }
+        }
+    }
+
+    sellBuilding(building) {
+        if (!building || !building.isBuilding || building.owner !== 'player') return;
+        if (building.type === 'construction_yard') return;
+
+        const def = BUILDING_DEFS[building.type];
+        const sellPrice = Math.floor(def.cost / 3);
+
+        // Refund any units in the build queue
+        if (building.buildQueue) {
+            for (const q of building.buildQueue) {
+                const uDef = UNIT_DEFS[q.type];
+                if (uDef) this.game.credits += uDef.cost;
+            }
+        }
+        if (building.currentBuild) {
+            const uDef = UNIT_DEFS[building.currentBuild.type];
+            if (uDef) this.game.credits += uDef.cost;
+        }
+
+        this.game.credits += sellPrice;
+        this.game.addExplosion(building.x, building.y, false);
+        this.game.removeEntity(building);
+        this.game.audio.play('cash');
+        this.game.audio.speak('Structure sold');
+        this.showStatus(`${def.name} sold for ${sellPrice} credits`);
+        this.updateBuildList();
+    }
+
     placeBuilding(tx, ty) {
         if (!this.placingBuilding) return false;
 
@@ -281,8 +353,8 @@ class UIManager {
                 building.isConstructing = false;
                 gameRef.audio.play('buildComplete');
                 gameRef.audio.speak('Construction complete');
-                // Spawn harvester with refinery
-                if (buildingType === 'refinery' && def.givesUnit) {
+                // Spawn free unit with building (refinery → harvester, helipad → ornithopter)
+                if (def.givesUnit) {
                     const spawnPoints = [];
                     for (let dy = -1; dy <= def.height; dy++) {
                         for (let dx = -1; dx <= def.width; dx++) {
@@ -296,9 +368,14 @@ class UIManager {
                     }
                     if (spawnPoints.length > 0) {
                         const sp = spawnPoints[0];
-                        const harvester = new Unit(sp.tx, sp.ty, 'player', 'harvester');
-                        harvester.state = 'harvesting';
-                        gameRef.addEntity(harvester);
+                        const freeUnit = new Unit(sp.tx, sp.ty, 'player', def.givesUnit);
+                        if (def.givesUnit === 'harvester') {
+                            freeUnit.state = 'harvesting';
+                        }
+                        if (def.givesUnit === 'ornithopter') {
+                            freeUnit.homeHelipad = building;
+                        }
+                        gameRef.addEntity(freeUnit);
                     }
                 }
             } else {
@@ -419,6 +496,9 @@ class UIManager {
             if (e.isUnit && e.type === 'harvester') {
                 html += `<br>Spice: ${Math.floor(e.spiceCarried)}/${e.capacity}`;
                 html += `<br>State: ${e.state}`;
+            } else if (e.isUnit && e.type === 'ornithopter') {
+                html += `<br>Gun: ${e.gunAmmo}/${e.maxGunAmmo} | Missiles: ${e.missileAmmo}/${e.maxMissileAmmo}`;
+                html += `<br>State: ${e.state}`;
             } else if (e.isUnit) {
                 html += `<br>State: ${e.state}`;
             }
@@ -429,7 +509,18 @@ class UIManager {
             if (e.isBuilding && e.buildQueue.length > 0) {
                 html += `<br>Queue: ${e.buildQueue.length}`;
             }
+            if (e.isBuilding && e.owner === 'player' && e.type !== 'construction_yard') {
+                const sellPrice = Math.floor(BUILDING_DEFS[e.type].cost / 3);
+                html += `<br><button id="sell-btn" style="margin-top:4px;background:#6a2020;color:#e0d5a0;border:1px solid #a44;padding:2px 10px;cursor:pointer;font-family:monospace;font-size:10px;">SELL (💰${sellPrice})</button>`;
+            }
             info.innerHTML = html;
+            // Attach sell button handler
+            const sellBtn = document.getElementById('sell-btn');
+            if (sellBtn) {
+                sellBtn.addEventListener('click', () => {
+                    this.sellBuilding(e);
+                });
+            }
         } else {
             info.innerHTML = `<b>${selected.length} units selected</b>`;
         }

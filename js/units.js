@@ -44,6 +44,21 @@ class Unit extends Entity {
         this.harvestTimer = 0;
         this.unloadTimer = 0;
 
+        // Aircraft specific (ornithopter)
+        this.isAircraft = def.isAircraft || false;
+        if (this.isAircraft) {
+            this.gunAmmo = def.gunAmmo || 0;
+            this.maxGunAmmo = def.gunAmmo || 0;
+            this.missileAmmo = def.missileAmmo || 0;
+            this.maxMissileAmmo = def.missileAmmo || 0;
+            this.missileDamage = def.missileDamage || 0;
+            this.homeHelipad = null; // assigned helipad
+            this.flyHeight = 0; // visual offset for flying
+            this.rearming = false;
+            this.rearmTimer = 0;
+            this.useMissile = false; // alternate between gun and missile
+        }
+
         // Set initial occupied
         this.prevTX = tx;
         this.prevTY = ty;
@@ -54,7 +69,13 @@ class Unit extends Entity {
         const fogOwner = (this.owner === 'fremen' && game.playerHouse === 'atreides') ? 'player'
             : (this.owner === 'sardaukar' && game.playerHouse === 'harkonnen') ? 'player'
             : this.owner;
-        game.map.revealArea(this.tx, this.ty, 4, fogOwner);
+        game.map.revealArea(this.tx, this.ty, this.isAircraft ? 6 : 4, fogOwner);
+
+        // Aircraft use direct flight, not pathfinding
+        if (this.isAircraft) {
+            this._updateAircraft(game);
+            return;
+        }
 
         // Always process movement if we have a path
         if (this.path && this.pathIndex < this.path.length) {
@@ -199,6 +220,12 @@ class Unit extends Entity {
     }
 
     moveTo(tx, ty, game) {
+        if (this.isAircraft) {
+            this._flyTarget = { x: tx * TILE_SIZE + TILE_SIZE / 2, y: ty * TILE_SIZE + TILE_SIZE / 2 };
+            this.state = 'moving';
+            this.target = null;
+            return;
+        }
         if (this.startPath(tx, ty, game)) {
             this.state = 'moving';
             this.target = null;
@@ -634,12 +661,309 @@ class Unit extends Entity {
         this._smoothTurnBody(game.deltaTime);
     }
 
+    _updateAircraft(game) {
+        // Bobbing flight height — descend when rearming or approaching helipad, ascend when flying
+        let targetHeight = 8 + Math.sin(Date.now() / 400) * 2;
+        if (this.state === 'rearming') {
+            targetHeight = 0;
+        } else if (this.state === 'returning_to_helipad' && this.homeHelipad && this.homeHelipad.hp > 0) {
+            const hDist = Math.sqrt((this.x - this.homeHelipad.x) ** 2 + (this.y - this.homeHelipad.y) ** 2);
+            if (hDist < TILE_SIZE * 3) {
+                // Descend as we approach
+                targetHeight = Math.max(0, (hDist / (TILE_SIZE * 3)) * 8);
+            }
+        }
+        const heightSpeed = 12 * (game.deltaTime / 1000);
+        if (this.flyHeight < targetHeight) {
+            this.flyHeight = Math.min(targetHeight, this.flyHeight + heightSpeed);
+        } else if (this.flyHeight > targetHeight) {
+            this.flyHeight = Math.max(targetHeight, this.flyHeight - heightSpeed);
+        }
+
+        // Aircraft don't occupy ground tiles
+        if (game.map.occupied[this.ty] && game.map.occupied[this.ty][this.tx] === this.id) {
+            game.map.occupied[this.ty][this.tx] = null;
+        }
+
+        switch (this.state) {
+            case 'idle':
+                // If out of ammo, return to rearm
+                if (this.gunAmmo <= 0 && this.missileAmmo <= 0) {
+                    this._returnToHelipad(game);
+                    break;
+                }
+                // Auto-attack nearby enemies
+                if (this.attackRange > 0) {
+                    const enemy = this.findNearestEnemy(game);
+                    if (enemy && tileDistance(this.tx, this.ty, enemy.tx, enemy.ty) <= this.attackRange + 3) {
+                        this.target = enemy;
+                        this.state = 'attacking';
+                    }
+                }
+                // Circle near home helipad when idle
+                if (!this.target && this.homeHelipad && this.homeHelipad.hp > 0) {
+                    const hx = this.homeHelipad.x;
+                    const hy = this.homeHelipad.y;
+                    const dist = Math.sqrt((this.x - hx) ** 2 + (this.y - hy) ** 2);
+                    if (dist > TILE_SIZE * 4) {
+                        this._flyToward(hx, hy, game);
+                    } else {
+                        // Orbit
+                        this.direction += 1.5 * (game.deltaTime / 1000);
+                        const orbitR = TILE_SIZE * 2.5;
+                        const ox = hx + Math.cos(Date.now() / 2000) * orbitR;
+                        const oy = hy + Math.sin(Date.now() / 2000) * orbitR;
+                        this._flyToward(ox, oy, game);
+                    }
+                }
+                break;
+
+            case 'attacking':
+                if (!this.target || this.target.hp <= 0) {
+                    this.target = null;
+                    // Return to patrol if we were patrolling before
+                    if (this._returnToPatrolAfterAttack && this._patrolCenter) {
+                        this._returnToPatrolAfterAttack = false;
+                        this.state = 'patrolling';
+                    } else {
+                        this.state = 'idle';
+                    }
+                    break;
+                }
+                // Out of all ammo — must return
+                if (this.gunAmmo <= 0 && this.missileAmmo <= 0) {
+                    this.target = null;
+                    this._returnToPatrolAfterAttack = false;
+                    this._patrolCenter = null;
+                    this._returnToHelipad(game);
+                    break;
+                }
+                const etx = this.target.isBuilding ? this.target.tx + Math.floor(this.target.width / 2) : this.target.tx;
+                const ety = this.target.isBuilding ? this.target.ty + Math.floor(this.target.height / 2) : this.target.ty;
+                const targetX = etx * TILE_SIZE + TILE_SIZE / 2;
+                const targetY = ety * TILE_SIZE + TILE_SIZE / 2;
+                const dist = tileDistance(this.tx, this.ty, etx, ety);
+
+                if (dist > this.attackRange) {
+                    this._flyToward(targetX, targetY, game);
+                } else {
+                    // In range — face and fire
+                    const tdx = targetX - this.x;
+                    const tdy = targetY - this.y;
+                    if (tdx !== 0 || tdy !== 0) {
+                        this.targetDirection = Math.atan2(tdy, tdx) + Math.PI / 2;
+                    }
+                    this._smoothTurnBody(game.deltaTime);
+
+                    const now = Date.now();
+                    if (now - this.lastAttackTime >= this.attackSpeed) {
+                        this.lastAttackTime = now;
+                        // Alternate: use missile if available and target is big, otherwise gun
+                        if (this.missileAmmo > 0 && (this.target.isBuilding || (this.target.maxHp && this.target.maxHp >= 150))) {
+                            this.missileAmmo--;
+                            game.addProjectile(this.x, this.y, this.target, this.missileDamage, this.owner, 'ornithopter_missile');
+                            game.audio.play('shoot_rocket');
+                        } else if (this.gunAmmo > 0) {
+                            this.gunAmmo--;
+                            game.addProjectile(this.x, this.y, this.target, this.attackDamage, this.owner, 'ornithopter_gun');
+                            game.audio.play('shoot_machinegun');
+                        } else {
+                            // All out
+                            this.target = null;
+                            this._returnToHelipad(game);
+                        }
+                    }
+                    // Slight strafing movement while attacking
+                    const strafeX = this.x + Math.sin(Date.now() / 300) * TILE_SIZE * 0.3;
+                    const strafeY = this.y + Math.cos(Date.now() / 350) * TILE_SIZE * 0.3;
+                    this._flyToward(strafeX, strafeY, game, 0.3);
+                }
+                break;
+
+            case 'moving':
+                if (this._flyTarget) {
+                    const dx = this._flyTarget.x - this.x;
+                    const dy = this._flyTarget.y - this.y;
+                    const d = Math.sqrt(dx * dx + dy * dy);
+                    if (d < TILE_SIZE) {
+                        // Arrived — patrol this area
+                        this._patrolCenter = { x: this._flyTarget.x, y: this._flyTarget.y };
+                        this._flyTarget = null;
+                        this.state = 'patrolling';
+                        if (this.owner === 'player') {
+                            game.ui.showStatus('Ornithopter patrolling area');
+                        }
+                    } else {
+                        this._flyToward(this._flyTarget.x, this._flyTarget.y, game);
+                    }
+                } else {
+                    this.state = 'idle';
+                }
+                break;
+
+            case 'patrolling':
+                // Out of ammo — head back
+                if (this.gunAmmo <= 0 && this.missileAmmo <= 0) {
+                    this._patrolCenter = null;
+                    this._returnToHelipad(game);
+                    break;
+                }
+                // Auto-attack nearby enemies while patrolling
+                if (this.attackRange > 0) {
+                    const patrolEnemy = this.findNearestEnemy(game);
+                    if (patrolEnemy && tileDistance(this.tx, this.ty, patrolEnemy.tx, patrolEnemy.ty) <= this.attackRange + 3) {
+                        this.target = patrolEnemy;
+                        this.state = 'attacking';
+                        this._returnToPatrolAfterAttack = true;
+                        break;
+                    }
+                }
+                // Circle the patrol point
+                if (this._patrolCenter) {
+                    const orbitR = TILE_SIZE * 3;
+                    const angle = Date.now() / 2500;
+                    const ox = this._patrolCenter.x + Math.cos(angle) * orbitR;
+                    const oy = this._patrolCenter.y + Math.sin(angle) * orbitR;
+                    this._flyToward(ox, oy, game);
+                } else {
+                    this.state = 'idle';
+                }
+                break;
+
+            case 'returning_to_helipad':
+                if (!this.homeHelipad || this.homeHelipad.hp <= 0) {
+                    // Helipad destroyed — find another
+                    this._findNewHelipad(game);
+                    if (!this.homeHelipad) {
+                        this.state = 'idle';
+                        break;
+                    }
+                }
+                const hx = this.homeHelipad.x;
+                const hy = this.homeHelipad.y;
+                const hDist = Math.sqrt((this.x - hx) ** 2 + (this.y - hy) ** 2);
+                if (hDist < TILE_SIZE) {
+                    // Landed — start rearming
+                    this.state = 'rearming';
+                    this.rearmTimer = 0;
+                    this.x = hx;
+                    this.y = hy;
+                    this.tx = this.homeHelipad.tx + Math.floor(this.homeHelipad.width / 2);
+                    this.ty = this.homeHelipad.ty + Math.floor(this.homeHelipad.height / 2);
+                    if (this.owner === 'player') {
+                        game.audio.speak('Rearming');
+                    }
+                } else {
+                    this._flyToward(hx, hy, game);
+                }
+                break;
+
+            case 'rearming':
+                this.rearmTimer += game.deltaTime;
+                const rearmDuration = 4000; // 4 seconds to rearm
+                if (this.rearmTimer >= rearmDuration) {
+                    this.gunAmmo = this.maxGunAmmo;
+                    this.missileAmmo = this.maxMissileAmmo;
+                    this.rearming = false;
+                    this.state = 'idle';
+                    if (this.owner === 'player') {
+                        game.audio.speak('Ornithopter re-armed');
+                        game.ui.showStatus('Ornithopter re-armed — assign new target');
+                    }
+                }
+                break;
+        }
+
+        // Clamp to map bounds
+        const mapPxW = MAP_WIDTH * TILE_SIZE;
+        const mapPxH = MAP_HEIGHT * TILE_SIZE;
+        this.x = Math.max(TILE_SIZE, Math.min(mapPxW - TILE_SIZE, this.x));
+        this.y = Math.max(TILE_SIZE, Math.min(mapPxH - TILE_SIZE, this.y));
+
+        // Update tile position based on pixel position
+        this.tx = Math.floor(this.x / TILE_SIZE);
+        this.ty = Math.floor(this.y / TILE_SIZE);
+    }
+
+    _flyToward(targetX, targetY, game, speedMul) {
+        const dx = targetX - this.x;
+        const dy = targetY - this.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 1) return;
+
+        const spd = this.speed * (game.deltaTime / 1000) * TILE_SIZE * 1.5 * (speedMul || 1);
+        let nx = dx / dist;
+        let ny = dy / dist;
+
+        // Separation from other ornithopters — push apart if too close
+        const separationDist = TILE_SIZE * 2;
+        let sepX = 0, sepY = 0;
+        for (const e of game.entities) {
+            if (e === this || !e.isAircraft || e.hp <= 0) continue;
+            const sx = this.x - e.x;
+            const sy = this.y - e.y;
+            const sd = Math.sqrt(sx * sx + sy * sy);
+            if (sd < separationDist && sd > 0) {
+                const force = (separationDist - sd) / separationDist;
+                sepX += (sx / sd) * force;
+                sepY += (sy / sd) * force;
+            }
+        }
+        // Blend separation into movement direction
+        if (sepX !== 0 || sepY !== 0) {
+            const sepLen = Math.sqrt(sepX * sepX + sepY * sepY);
+            nx = nx * 0.6 + (sepX / sepLen) * 0.4;
+            ny = ny * 0.6 + (sepY / sepLen) * 0.4;
+            const nLen = Math.sqrt(nx * nx + ny * ny);
+            if (nLen > 0) { nx /= nLen; ny /= nLen; }
+        }
+
+        this.x += nx * spd;
+        this.y += ny * spd;
+
+        // Face direction of travel
+        if (dx !== 0 || dy !== 0) {
+            this.targetDirection = Math.atan2(dy, dx) + Math.PI / 2;
+        }
+        this._smoothTurnBody(game.deltaTime);
+        this.moving = true;
+    }
+
+    _returnToHelipad(game) {
+        if (!this.homeHelipad || this.homeHelipad.hp <= 0) {
+            this._findNewHelipad(game);
+        }
+        if (this.homeHelipad) {
+            this.state = 'returning_to_helipad';
+            this.target = null;
+            if (this.owner === 'player') {
+                game.audio.speak('Returning to re-arm');
+            }
+        }
+    }
+
+    _findNewHelipad(game) {
+        let best = null;
+        let bestDist = Infinity;
+        for (const e of game.entities) {
+            if (e.type === 'helipad' && e.owner === this.owner && e.hp > 0) {
+                const d = Math.sqrt((this.x - e.x) ** 2 + (this.y - e.y) ** 2);
+                if (d < bestDist) {
+                    bestDist = d;
+                    best = e;
+                }
+            }
+        }
+        this.homeHelipad = best;
+    }
+
     _getWeaponSound() {
         switch (this.type) {
             case 'light_infantry': return 'shoot_rifle';
             case 'heavy_trooper': return 'shoot_rocket';
             case 'rocket_infantry': return 'shoot_rocket';
             case 'commando': return 'shoot_sniper';
+            case 'ornithopter': return 'shoot_machinegun';
             case 'trike': return 'shoot_machinegun';
             case 'quad': return 'shoot_machinegun';
             case 'tank':
@@ -699,6 +1023,10 @@ class Unit extends Entity {
                 break;
             case 'commando':
                 SpriteRenderer.drawCommando(ctx, screenX, screenY, this.direction, colors);
+                break;
+            case 'ornithopter':
+                const landed = this.state === 'rearming' && this.flyHeight < 1;
+                SpriteRenderer.drawOrnithopter(ctx, screenX, screenY - (this.flyHeight || 0), this.direction, colors, landed);
                 break;
             default:
                 // Fallback for any unknown unit types
@@ -780,7 +1108,7 @@ class Unit extends Entity {
         }
 
         // Heal/repair state labels for non-harvester units
-        if (this.type !== 'harvester') {
+        if (this.type !== 'harvester' && this.type !== 'ornithopter') {
             const labelY = screenY + TILE_SIZE / 2 + 8;
             if (this.state === 'moving_to_heal') {
                 ctx.font = '9px monospace';
@@ -804,6 +1132,38 @@ class Unit extends Entity {
                 ctx.fillStyle = pulse;
                 ctx.textAlign = 'center';
                 ctx.fillText('REPAIRING', screenX, labelY);
+            }
+        }
+
+        // Ornithopter ammo and state display
+        if (this.type === 'ornithopter') {
+            const ammoY = screenY + TILE_SIZE / 2 + 3 - (this.flyHeight || 8);
+            ctx.font = '8px monospace';
+            ctx.textAlign = 'center';
+
+            // Ammo counts
+            const gunColor = this.gunAmmo > 0 ? '#ff0' : '#555';
+            const missileColor = this.missileAmmo > 0 ? '#f80' : '#555';
+            ctx.fillStyle = gunColor;
+            ctx.fillText(`G:${this.gunAmmo}`, screenX - 10, ammoY);
+            ctx.fillStyle = missileColor;
+            ctx.fillText(`M:${this.missileAmmo}`, screenX + 10, ammoY);
+
+            // State label
+            if (this.state === 'patrolling') {
+                ctx.font = '9px monospace';
+                ctx.fillStyle = '#aaf';
+                ctx.fillText('PATROL', screenX, ammoY + 10);
+            } else if (this.state === 'returning_to_helipad') {
+                ctx.font = '9px monospace';
+                ctx.fillStyle = '#8cf';
+                ctx.fillText('RTB', screenX, ammoY + 10);
+            } else if (this.state === 'rearming') {
+                ctx.font = '9px monospace';
+                const pulse = Math.sin(Date.now() / 300) > 0 ? '#0f0' : '#0a0';
+                ctx.fillStyle = pulse;
+                const pct = Math.floor((this.rearmTimer / 4000) * 100);
+                ctx.fillText(`REARM ${pct}%`, screenX, ammoY + 10);
             }
         }
     }

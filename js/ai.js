@@ -9,10 +9,11 @@ class AIPlayer {
         this.state = 'building'; // building, attacking
         this.buildOrder = [
             'wind_trap', 'refinery', 'barracks', 'wind_trap',
-            'light_factory', 'refinery', 'heavy_factory', 'turret', 'turret'
+            'light_factory', 'refinery', 'heavy_factory', 'turret', 'turret',
+            'helipad'
         ];
         this.buildIndex = 0;
-        this.unitBuildOrder = ['light_infantry', 'light_infantry', 'trike', 'rocket_infantry', 'tank', 'heavy_trooper', 'tank', 'siege_tank', 'rocket_infantry', 'commando'];
+        this.unitBuildOrder = ['light_infantry', 'light_infantry', 'trike', 'rocket_infantry', 'tank', 'heavy_trooper', 'tank', 'siege_tank', 'rocket_infantry', 'commando', 'ornithopter'];
         this.unitBuildIndex = 0;
     }
 
@@ -71,9 +72,12 @@ class AIPlayer {
                 this.lastBuildTime = Date.now();
                 placed = true;
 
-                // Spawn harvester with refinery
+                // Spawn free unit with building
                 if (type === 'refinery') {
                     this.spawnUnit('harvester', building);
+                } else if (type === 'helipad') {
+                    const ornithopter = this.spawnUnit('ornithopter', building);
+                    if (ornithopter) ornithopter.homeHelipad = building;
                 }
                 break;
             }
@@ -107,6 +111,7 @@ class AIPlayer {
         if (def.buildAt === 'barracks') factory = barracks;
         else if (def.buildAt === 'light_factory') factory = lightFactory;
         else if (def.buildAt === 'heavy_factory') factory = heavyFactory;
+        else if (def.buildAt === 'helipad') factory = this.game.entities.find(e => e.type === 'helipad' && e.owner === 'enemy' && !e.currentBuild);
 
         if (factory) {
             factory.queueUnit(unitType);
@@ -132,7 +137,9 @@ class AIPlayer {
             const unit = new Unit(sp.tx, sp.ty, 'enemy', type);
             if (type === 'harvester') unit.state = 'harvesting';
             this.game.addEntity(unit);
+            return unit;
         }
+        return null;
     }
 
     tryAttack() {

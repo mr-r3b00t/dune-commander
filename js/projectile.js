@@ -16,7 +16,33 @@ class Projectile {
         this.maxTrailLength = 8;
 
         // Determine projectile type based on source unit or damage
-        if (sourceType === 'commando') {
+        if (sourceType === 'ornithopter_gun') {
+            // Aircraft gun burst - fast small rounds
+            this.type = 'bullet';
+            this.speed = 11;
+            this.size = 1.2;
+            this.glowSize = 3;
+            this.trailWidth = 0.8;
+            this.maxTrailLength = 5;
+            this.headColor = '#ffee88';
+            this.glowColor = 'rgba(255, 240, 100, 0.3)';
+            this.trailColors = ['rgba(255, 240, 100, 0.3)', 'rgba(255, 200, 50, 0.15)', 'rgba(200, 160, 0, 0.05)'];
+            this.smokeTrail = false;
+            this.arcHeight = 0;
+        } else if (sourceType === 'ornithopter_missile') {
+            // Aircraft missile - medium speed, smoke trail
+            this.type = 'rocket';
+            this.speed = 6;
+            this.size = 2.5;
+            this.glowSize = 8;
+            this.trailWidth = 2;
+            this.maxTrailLength = 10;
+            this.headColor = '#ff6622';
+            this.glowColor = 'rgba(255, 100, 20, 0.5)';
+            this.trailColors = ['rgba(255, 120, 20, 0.5)', 'rgba(200, 60, 0, 0.3)', 'rgba(100, 30, 0, 0.1)'];
+            this.smokeTrail = true;
+            this.arcHeight = 0;
+        } else if (sourceType === 'commando') {
             // Sniper round - very fast, thin tracer, long trail
             this.type = 'sniper';
             this.speed = 14;
@@ -97,19 +123,34 @@ class Projectile {
             this.distanceToTarget = Math.sqrt(dx * dx + dy * dy);
         }
 
+        // Homing vs ballistic: rockets/missiles track, everything else is ballistic
+        this.homing = (this.type === 'rocket' || this.type === 'siege');
+        // For ballistic projectiles, lock in the target position at fire time
+        if (!this.homing && this.target) {
+            this.destX = this.target.x;
+            this.destY = this.target.y;
+        }
+
         // Smoke trail timer
         this.smokeTimer = 0;
         this.smokeInterval = 30;
     }
 
     update(game) {
-        if (!this.target || this.target.hp <= 0) {
+        const dt = game.deltaTime / 16;
+        this.age += game.deltaTime;
+
+        // Homing projectiles need a live target
+        if (this.homing && (!this.target || this.target.hp <= 0)) {
             this.alive = false;
             return;
         }
 
-        const dt = game.deltaTime / 16;
-        this.age += game.deltaTime;
+        // Ballistic projectiles keep going to their destination
+        if (!this.homing && !this.destX && !this.destY) {
+            this.alive = false;
+            return;
+        }
 
         // Update muzzle flash
         if (this.showMuzzleFlash) {
@@ -125,8 +166,9 @@ class Projectile {
             this.trail.pop();
         }
 
-        const tx = this.target.x;
-        const ty = this.target.y;
+        // Homing projectiles track the target, ballistic go to locked destination
+        const tx = this.homing ? this.target.x : this.destX;
+        const ty = this.homing ? this.target.y : this.destY;
         const dx = tx - this.x;
         const dy = ty - this.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -150,21 +192,42 @@ class Projectile {
                 }
             }
 
-            const destroyed = this.target.takeDamage(this.damage, this.owner, game);
-            if (destroyed) {
-                game.addExplosion(this.target.x, this.target.y, this.target.isBuilding);
-                // Play destruction sound based on what was destroyed
-                if (this.target.isBuilding) {
-                    game.audio.play('building_destroyed');
-                } else if (this.target.isUnit) {
-                    const t = this.target.type;
-                    if (t === 'light_infantry' || t === 'heavy_trooper') {
-                        game.audio.play('unit_killed');
-                    } else {
-                        game.audio.play('vehicle_destroyed');
+            // For homing projectiles, hit the tracked target directly
+            // For ballistic, find whatever is closest to the impact point
+            let hitTarget = this.target;
+            if (!this.homing) {
+                // Find the closest enemy entity near the impact
+                let bestDist = TILE_SIZE * 1.5; // hit radius
+                hitTarget = null;
+                for (const e of game.entities) {
+                    if (e.hp <= 0) continue;
+                    if (e.owner === this.owner) continue;
+                    const ex = e.x || (e.tx * TILE_SIZE + TILE_SIZE / 2);
+                    const ey = e.y || (e.ty * TILE_SIZE + TILE_SIZE / 2);
+                    const d = Math.sqrt((this.x - ex) ** 2 + (this.y - ey) ** 2);
+                    if (d < bestDist) {
+                        bestDist = d;
+                        hitTarget = e;
                     }
                 }
-                game.removeEntity(this.target);
+            }
+
+            if (hitTarget && hitTarget.hp > 0) {
+                const destroyed = hitTarget.takeDamage(this.damage, this.owner, game);
+                if (destroyed) {
+                    game.addExplosion(hitTarget.x, hitTarget.y, hitTarget.isBuilding);
+                    if (hitTarget.isBuilding) {
+                        game.audio.play('building_destroyed');
+                    } else if (hitTarget.isUnit) {
+                        const t = hitTarget.type;
+                        if (t === 'light_infantry' || t === 'heavy_trooper') {
+                            game.audio.play('unit_killed');
+                        } else {
+                            game.audio.play('vehicle_destroyed');
+                        }
+                    }
+                    game.removeEntity(hitTarget);
+                }
             }
             this.alive = false;
             return;

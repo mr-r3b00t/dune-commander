@@ -202,6 +202,19 @@ const BUILDING_DEFS = {
         power: -15,
         requires: ['barracks'],
         description: 'Heals wounded infantry.'
+    },
+    helipad: {
+        name: 'Helipad',
+        icon: '🚁',
+        width: 2,
+        height: 2,
+        cost: 700,
+        buildTime: 7000,
+        hp: 600,
+        power: -25,
+        requires: ['heavy_factory'],
+        description: 'Builds and re-arms Ornithopters. Holds one aircraft.',
+        givesUnit: 'ornithopter'
     }
 };
 
@@ -362,6 +375,24 @@ const UNIT_DEFS = {
         requires: ['barracks', 'heavy_factory'],
         unique: true,
         description: 'Elite sniper commando. Devastating long-range shots. Only one allowed.'
+    },
+    ornithopter: {
+        name: 'Ornithopter',
+        icon: '🚁',
+        cost: 600,
+        buildTime: 8000,
+        hp: 150,
+        speed: 3.5,
+        attackRange: 6,
+        attackDamage: 22,
+        attackSpeed: 1200,
+        buildAt: 'helipad',
+        requires: ['helipad'],
+        isAircraft: true,
+        gunAmmo: 12,
+        missileAmmo: 4,
+        missileDamage: 35,
+        description: 'Fast attack aircraft. Limited ammo — must return to helipad to re-arm.'
     }
 };
 

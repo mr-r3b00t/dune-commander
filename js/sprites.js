@@ -3489,5 +3489,268 @@ const SpriteRenderer = {
         ctx.lineTo(x, y + r);
         ctx.quadraticCurveTo(x, y, x + r, y);
         ctx.closePath();
+    },
+
+    drawHelipad(ctx, x, y, w, h, colors) {
+        ctx.save();
+        ctx.translate(x, y);
+        const t = Date.now();
+        const hw = w / 2, hh = h / 2;
+
+        // Base platform - concrete pad
+        const baseGrad = ctx.createLinearGradient(-hw, -hh, hw, hh);
+        baseGrad.addColorStop(0, '#666');
+        baseGrad.addColorStop(0.5, '#777');
+        baseGrad.addColorStop(1, '#5a5a5a');
+        ctx.fillStyle = baseGrad;
+        this._roundedRect(ctx, -hw, -hh, w, h, 3);
+        ctx.fill();
+
+        // Concrete texture lines
+        ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(-hw, 0); ctx.lineTo(hw, 0);
+        ctx.moveTo(0, -hh); ctx.lineTo(0, hh);
+        ctx.stroke();
+
+        // Landing circle
+        ctx.strokeStyle = colors.secondary;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, Math.min(hw, hh) * 0.6, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // H marking
+        ctx.fillStyle = colors.primary;
+        ctx.font = `bold ${Math.floor(h * 0.35)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('H', 0, 1);
+
+        // Corner markings
+        const cm = 4;
+        ctx.strokeStyle = colors.secondary;
+        ctx.lineWidth = 1.5;
+        // Top-left
+        ctx.beginPath(); ctx.moveTo(-hw + 2, -hh + cm + 2); ctx.lineTo(-hw + 2, -hh + 2); ctx.lineTo(-hw + cm + 2, -hh + 2); ctx.stroke();
+        // Top-right
+        ctx.beginPath(); ctx.moveTo(hw - cm - 2, -hh + 2); ctx.lineTo(hw - 2, -hh + 2); ctx.lineTo(hw - 2, -hh + cm + 2); ctx.stroke();
+        // Bottom-left
+        ctx.beginPath(); ctx.moveTo(-hw + 2, hh - cm - 2); ctx.lineTo(-hw + 2, hh - 2); ctx.lineTo(-hw + cm + 2, hh - 2); ctx.stroke();
+        // Bottom-right
+        ctx.beginPath(); ctx.moveTo(hw - cm - 2, hh - 2); ctx.lineTo(hw - 2, hh - 2); ctx.lineTo(hw - 2, hh - cm - 2); ctx.stroke();
+
+        // Warning stripes on edges
+        ctx.fillStyle = '#cc8800';
+        ctx.fillRect(-hw, -hh, w, 2);
+        ctx.fillRect(-hw, hh - 2, w, 2);
+        ctx.fillStyle = '#222';
+        for (let i = -hw; i < hw; i += 6) {
+            ctx.fillRect(i, -hh, 3, 2);
+            ctx.fillRect(i + 3, hh - 2, 3, 2);
+        }
+
+        // Fuel/ammo depot on side
+        ctx.fillStyle = this._darken(colors.dark, 0.1);
+        ctx.fillRect(hw - 10, -hh + 4, 8, 6);
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(hw - 10, -hh + 4, 8, 6);
+        // Ammo crate
+        ctx.fillStyle = '#554422';
+        ctx.fillRect(hw - 9, -hh + 5, 3, 4);
+        ctx.fillStyle = '#443311';
+        ctx.fillRect(hw - 5, -hh + 5, 3, 4);
+
+        // Blinking light
+        if (Math.sin(t / 500) > 0) {
+            ctx.fillStyle = '#00ff44';
+            ctx.beginPath();
+            ctx.arc(-hw + 5, -hh + 5, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // House color border
+        ctx.strokeStyle = colors.primary;
+        ctx.lineWidth = 1.5;
+        this._roundedRect(ctx, -hw, -hh, w, h, 3);
+        ctx.stroke();
+
+        ctx.restore();
+    },
+
+    drawOrnithopter(ctx, x, y, dir, colors, landed) {
+        ctx.save();
+        ctx.translate(x, y);
+
+        const t = Date.now();
+        const wingFlap = landed ? 0 : Math.sin(t / 80) * 0.35;
+        const bodyBob = landed ? 0 : Math.sin(t / 400) * 1;
+
+        // Shadow on ground (below the aircraft)
+        if (!landed) {
+            ctx.save();
+            ctx.globalAlpha = 0.2;
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.ellipse(0, 8 + (this.flyHeight || 8), 10, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        ctx.save();
+        ctx.rotate(dir);
+        ctx.translate(0, bodyBob);
+
+        // Fuselage body
+        const bodyGrad = ctx.createLinearGradient(-3, 0, 3, 0);
+        bodyGrad.addColorStop(0, this._darken(colors.primary, 0.2));
+        bodyGrad.addColorStop(0.5, colors.primary);
+        bodyGrad.addColorStop(1, this._darken(colors.primary, 0.15));
+        ctx.fillStyle = bodyGrad;
+        ctx.beginPath();
+        ctx.moveTo(0, -10); // nose
+        ctx.lineTo(3.5, -4);
+        ctx.lineTo(3.5, 6);
+        ctx.lineTo(2, 9); // tail
+        ctx.lineTo(-2, 9);
+        ctx.lineTo(-3.5, 6);
+        ctx.lineTo(-3.5, -4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = this._darken(colors.dark, 0.1);
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+
+        // Cockpit canopy
+        const canopyGrad = ctx.createLinearGradient(-2, -8, 2, -5);
+        canopyGrad.addColorStop(0, 'rgba(120,180,255,0.8)');
+        canopyGrad.addColorStop(0.5, 'rgba(80,140,220,0.6)');
+        canopyGrad.addColorStop(1, 'rgba(60,100,180,0.4)');
+        ctx.fillStyle = canopyGrad;
+        ctx.beginPath();
+        ctx.moveTo(0, -9);
+        ctx.lineTo(2, -5);
+        ctx.lineTo(-2, -5);
+        ctx.closePath();
+        ctx.fill();
+        // Canopy glint
+        ctx.fillStyle = 'rgba(200,230,255,0.4)';
+        ctx.beginPath();
+        ctx.moveTo(-0.5, -8);
+        ctx.lineTo(0.5, -7);
+        ctx.lineTo(-1, -6);
+        ctx.closePath();
+        ctx.fill();
+
+        // Left wing
+        ctx.save();
+        ctx.translate(-3.5, -1);
+        ctx.rotate(-wingFlap);
+        const lwGrad = ctx.createLinearGradient(0, 0, -11, 0);
+        lwGrad.addColorStop(0, colors.primary);
+        lwGrad.addColorStop(0.7, this._darken(colors.primary, 0.15));
+        lwGrad.addColorStop(1, this._darken(colors.dark, 0.1));
+        ctx.fillStyle = lwGrad;
+        ctx.beginPath();
+        ctx.moveTo(0, -2);
+        ctx.lineTo(-11, -1);
+        ctx.lineTo(-10, 2);
+        ctx.lineTo(0, 3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = this._darken(colors.dark, 0.1);
+        ctx.lineWidth = 0.4;
+        ctx.stroke();
+        // Wing weapon hardpoint
+        ctx.fillStyle = '#333';
+        ctx.fillRect(-7, 0, 2, 1.5);
+        ctx.restore();
+
+        // Right wing
+        ctx.save();
+        ctx.translate(3.5, -1);
+        ctx.rotate(wingFlap);
+        const rwGrad = ctx.createLinearGradient(0, 0, 11, 0);
+        rwGrad.addColorStop(0, colors.primary);
+        rwGrad.addColorStop(0.7, this._darken(colors.primary, 0.15));
+        rwGrad.addColorStop(1, this._darken(colors.dark, 0.1));
+        ctx.fillStyle = rwGrad;
+        ctx.beginPath();
+        ctx.moveTo(0, -2);
+        ctx.lineTo(11, -1);
+        ctx.lineTo(10, 2);
+        ctx.lineTo(0, 3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = this._darken(colors.dark, 0.1);
+        ctx.lineWidth = 0.4;
+        ctx.stroke();
+        // Wing weapon hardpoint
+        ctx.fillStyle = '#333';
+        ctx.fillRect(5, 0, 2, 1.5);
+        ctx.restore();
+
+        // Tail fins
+        ctx.fillStyle = colors.secondary;
+        // Left tail fin
+        ctx.beginPath();
+        ctx.moveTo(-2, 7);
+        ctx.lineTo(-5, 10);
+        ctx.lineTo(-1, 9);
+        ctx.closePath();
+        ctx.fill();
+        // Right tail fin
+        ctx.beginPath();
+        ctx.moveTo(2, 7);
+        ctx.lineTo(5, 10);
+        ctx.lineTo(1, 9);
+        ctx.closePath();
+        ctx.fill();
+
+        // Engine glow on back
+        if (!landed) {
+            const engineGlow = Math.sin(t / 100) * 0.2 + 0.7;
+            ctx.fillStyle = `rgba(100,180,255,${engineGlow * 0.5})`;
+            ctx.beginPath();
+            ctx.ellipse(0, 9, 2, 1.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Nose gun
+        ctx.fillStyle = '#333';
+        ctx.fillRect(-0.8, -11.5, 1.6, 2);
+
+        // Panel lines
+        ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+        ctx.lineWidth = 0.4;
+        ctx.beginPath();
+        ctx.moveTo(-2, -3); ctx.lineTo(2, -3);
+        ctx.moveTo(-2, 2); ctx.lineTo(2, 2);
+        ctx.stroke();
+
+        // House insignia dot
+        ctx.fillStyle = colors.secondary;
+        ctx.beginPath();
+        ctx.arc(0, 0, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+        ctx.restore();
+    },
+
+    _roundedRect(ctx, x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
     }
 };

@@ -888,7 +888,7 @@ class Game {
 
         // Dust trails for moving vehicles & smoke for damaged buildings
         for (const entity of this.entities) {
-            if (entity.isUnit && entity.moving && entity.type !== 'light_infantry' && entity.type !== 'heavy_trooper' && entity.type !== 'rocket_infantry' && entity.type !== 'commando') {
+            if (entity.isUnit && entity.moving && entity.type !== 'light_infantry' && entity.type !== 'heavy_trooper' && entity.type !== 'rocket_infantry' && entity.type !== 'commando' && entity.type !== 'ornithopter') {
                 if (Math.random() < 0.3) {
                     this.particles.addDustTrail(entity.x, entity.y);
                 }

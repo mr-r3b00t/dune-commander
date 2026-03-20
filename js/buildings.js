@@ -307,6 +307,11 @@ class Building extends Entity {
                 unit.state = 'harvesting';
             }
 
+            // Assign home helipad for ornithopters
+            if (unitType === 'ornithopter') {
+                unit.homeHelipad = this;
+            }
+
             game.audio.play('unitReady');
             if (this.owner === 'player') {
                 const def = UNIT_DEFS[unitType];
@@ -371,6 +376,9 @@ class Building extends Entity {
                 break;
             case 'hospital':
                 SpriteRenderer.drawHospital(ctx, screenX, screenY, w, h, colors);
+                break;
+            case 'helipad':
+                SpriteRenderer.drawHelipad(ctx, screenX, screenY, w, h, colors);
                 break;
             default:
                 // Fallback
