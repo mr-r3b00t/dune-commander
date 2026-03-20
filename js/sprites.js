@@ -1129,6 +1129,144 @@ const SpriteRenderer = {
         ctx.restore();
     },
 
+    drawDevastator(ctx, x, y, dir, colors) {
+        ctx.save();
+        ctx.translate(x, y);
+
+        // Larger shadow — this is a big trooper
+        this._unitShadow(ctx, 0, 5, 10, 5);
+        this._groundContact(ctx, 0, 4, 9, 4);
+
+        const t = Date.now();
+        const walk = Math.sin(t / 200) * 1; // slow heavy stride
+        const breathe = Math.sin(t / 700) * 0.3;
+
+        // Heavy armored boots - thick and wide
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(-4.5, 1 + walk, 3.5, 5.5);
+        ctx.fillRect(1, 1 - walk, 3.5, 5.5);
+        // Steel toecaps
+        ctx.fillStyle = '#333';
+        ctx.fillRect(-4.5, 5.5 + walk, 3.5, 1.2);
+        ctx.fillRect(1, 5.5 - walk, 3.5, 1.2);
+
+        // Massive armored body — wider and thicker than normal infantry
+        const bodyGrad = ctx.createRadialGradient(-1, -3, 0, 0, -2, 10);
+        bodyGrad.addColorStop(0, '#555');
+        bodyGrad.addColorStop(0.5, '#3a3a3a');
+        bodyGrad.addColorStop(1, '#222');
+        ctx.fillStyle = bodyGrad;
+        ctx.fillRect(-6, -8 + breathe, 12, 10);
+        // Rounded shoulders
+        ctx.beginPath();
+        ctx.arc(-5, -7 + breathe, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(5, -7 + breathe, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // House color armor plates
+        const plateGrad = ctx.createLinearGradient(-5, -8, 5, 0);
+        plateGrad.addColorStop(0, colors.primary);
+        plateGrad.addColorStop(0.5, this._darken(colors.primary, 0.2));
+        plateGrad.addColorStop(1, colors.dark);
+        ctx.fillStyle = plateGrad;
+        ctx.fillRect(-5, -7 + breathe, 10, 6);
+        // Armor trim
+        ctx.strokeStyle = colors.secondary;
+        ctx.lineWidth = 0.8;
+        ctx.strokeRect(-5, -7 + breathe, 10, 6);
+
+        // Skull/hazard insignia on chest
+        ctx.fillStyle = '#ddd';
+        ctx.font = '6px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('☠', 0, -2.5 + breathe);
+
+        // Heavy belt with ammo pouches
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(-5.5, -1 + breathe, 11, 2);
+        ctx.fillStyle = '#2a2218';
+        ctx.fillRect(-5, 0 + breathe, 2.5, 1.5);
+        ctx.fillRect(2.5, 0 + breathe, 2.5, 1.5);
+        // Belt buckle
+        ctx.fillStyle = '#aa8833';
+        ctx.fillRect(-1, -0.5 + breathe, 2, 1.5);
+
+        // Head — heavy helmet
+        const helmetGrad = ctx.createRadialGradient(-0.5, -12, 0, 0, -11, 5);
+        helmetGrad.addColorStop(0, '#4a4a4a');
+        helmetGrad.addColorStop(0.5, '#333');
+        helmetGrad.addColorStop(1, '#1a1a1a');
+        ctx.fillStyle = helmetGrad;
+        ctx.beginPath();
+        ctx.arc(0, -11 + breathe, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Visor — red glowing slit
+        ctx.fillStyle = '#111';
+        ctx.fillRect(-3.5, -12 + breathe, 7, 2.5);
+        const visorGlow = Math.sin(t / 400) * 0.15 + 0.85;
+        ctx.fillStyle = `rgba(255,50,30,${visorGlow})`;
+        ctx.fillRect(-3, -11.5 + breathe, 6, 1.5);
+        // Visor reflection
+        ctx.fillStyle = `rgba(255,150,100,${visorGlow * 0.4})`;
+        ctx.fillRect(-2, -11.2 + breathe, 1.5, 0.8);
+
+        // Helmet crest
+        ctx.fillStyle = colors.primary;
+        ctx.fillRect(-1, -15 + breathe, 2, 3);
+
+        // Heavy weapon: autocannon / heavy machine gun
+        const wx = Math.sin(dir) * 4;
+        const wy = -Math.cos(dir) * 2;
+        ctx.save();
+        ctx.translate(wx + 5, -5 + wy + breathe);
+        ctx.rotate(dir * 0.2);
+
+        // Gun body — thick and heavy
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(-1.5, 4, 3.5, -18);
+        // Barrel shroud with cooling vents
+        ctx.fillStyle = '#333';
+        ctx.fillRect(-1, -14, 2.5, 8);
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(-0.5, -13, 1.5, 0.5);
+        ctx.fillRect(-0.5, -11.5, 1.5, 0.5);
+        ctx.fillRect(-0.5, -10, 1.5, 0.5);
+        ctx.fillRect(-0.5, -8.5, 1.5, 0.5);
+
+        // Ammo drum
+        ctx.fillStyle = '#444';
+        ctx.beginPath();
+        ctx.arc(-2, -2, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+
+        // Muzzle brake
+        ctx.fillStyle = '#111';
+        ctx.fillRect(-1, -16, 2.5, 2);
+        ctx.fillStyle = '#222';
+        ctx.fillRect(-1.5, -16.5, 3.5, 0.8);
+
+        ctx.restore();
+
+        // Backpack — ammo and power supply
+        ctx.fillStyle = '#2a2a20';
+        ctx.fillRect(-5, -5 + breathe, 3, 4);
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(-5, -5 + breathe, 3, 4);
+        // Power indicator
+        const powerBlink = Math.sin(t / 300) > 0 ? '#00ff00' : '#008800';
+        ctx.fillStyle = powerBlink;
+        ctx.fillRect(-4.5, -4.5 + breathe, 1, 1);
+
+        ctx.restore();
+    },
+
     drawTrike(ctx, x, y, dir, colors) {
         ctx.save();
         ctx.translate(x, y);

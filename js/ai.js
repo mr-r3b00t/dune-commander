@@ -13,7 +13,12 @@ class AIPlayer {
             'helipad'
         ];
         this.buildIndex = 0;
-        this.unitBuildOrder = ['light_infantry', 'light_infantry', 'trike', 'rocket_infantry', 'tank', 'heavy_trooper', 'tank', 'siege_tank', 'rocket_infantry', 'commando', 'ornithopter'];
+        // Harkonnen AI gets devastators in their build order
+        if (game.enemyHouse === 'harkonnen') {
+            this.unitBuildOrder = ['light_infantry', 'light_infantry', 'trike', 'rocket_infantry', 'devastator', 'tank', 'heavy_trooper', 'devastator', 'tank', 'siege_tank', 'rocket_infantry', 'commando', 'ornithopter', 'devastator'];
+        } else {
+            this.unitBuildOrder = ['light_infantry', 'light_infantry', 'trike', 'rocket_infantry', 'tank', 'heavy_trooper', 'tank', 'siege_tank', 'rocket_infantry', 'commando', 'ornithopter'];
+        }
         this.unitBuildIndex = 0;
     }
 

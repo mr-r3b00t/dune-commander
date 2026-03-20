@@ -103,6 +103,9 @@ class UIManager {
             }
         } else {
             for (const [key, def] of Object.entries(UNIT_DEFS)) {
+                // House-exclusive units: skip if not the right house
+                if (def.house && def.house !== this.game.playerHouse) continue;
+
                 const available = this.checkRequirements(def.requires);
                 const affordable = this.game.credits >= def.cost;
                 const hasFactory = this.game.entities.some(

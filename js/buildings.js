@@ -148,7 +148,7 @@ class Building extends Entity {
 
         const cx = this.tx + Math.floor(this.width / 2);
         const cy = this.ty + Math.floor(this.height / 2);
-        const infantryTypes = ['light_infantry', 'heavy_trooper', 'rocket_infantry', 'commando'];
+        const infantryTypes = ['light_infantry', 'heavy_trooper', 'rocket_infantry', 'commando', 'devastator'];
 
         for (const entity of game.entities) {
             if (!entity.isUnit) continue;
@@ -180,7 +180,7 @@ class Building extends Entity {
 
         const cx = this.tx + Math.floor(this.width / 2);
         const cy = this.ty + Math.floor(this.height / 2);
-        const infantryTypes = ['light_infantry', 'heavy_trooper', 'rocket_infantry', 'commando'];
+        const infantryTypes = ['light_infantry', 'heavy_trooper', 'rocket_infantry', 'commando', 'devastator'];
 
         for (const entity of game.entities) {
             if (!entity.isUnit) continue;

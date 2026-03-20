@@ -497,6 +497,15 @@ class AudioManager {
                 this.playTone(100, 0.1, 'sawtooth', 0.15, 0.1);
                 break;
 
+            case 'shoot_cannon':
+                // Devastator heavy autocannon — deep rapid thump
+                if (this._throttle('shoot_cannon', 150)) break;
+                this.playNoise(0.12, 0.45);
+                this.playTone(70, 0.15, 'sawtooth', 0.35);
+                this.playTone(45, 0.2, 'square', 0.25, 0.04);
+                this.playTone(150, 0.06, 'sawtooth', 0.15, 0.08);
+                break;
+
             case 'shoot_turret':
                 // Turret - heavy repeating fire
                 if (this._throttle('shoot_turret', 120)) break;

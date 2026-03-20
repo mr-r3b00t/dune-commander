@@ -42,6 +42,19 @@ class Projectile {
             this.trailColors = ['rgba(255, 120, 20, 0.5)', 'rgba(200, 60, 0, 0.3)', 'rgba(100, 30, 0, 0.1)'];
             this.smokeTrail = true;
             this.arcHeight = 0;
+        } else if (sourceType === 'devastator') {
+            // Heavy autocannon shell — chunky, fast, with a short smoke puff
+            this.type = 'cannon';
+            this.speed = 7;
+            this.size = 2.5;
+            this.glowSize = 6;
+            this.trailWidth = 2;
+            this.maxTrailLength = 6;
+            this.headColor = '#ffaa33';
+            this.glowColor = 'rgba(255, 160, 50, 0.45)';
+            this.trailColors = ['rgba(255, 160, 50, 0.5)', 'rgba(200, 100, 20, 0.3)', 'rgba(100, 50, 10, 0.1)'];
+            this.smokeTrail = true;
+            this.arcHeight = 0;
         } else if (sourceType === 'commando') {
             // Sniper round - very fast, thin tracer, long trail
             this.type = 'sniper';

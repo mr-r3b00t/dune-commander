@@ -377,7 +377,7 @@ class Game {
             return tx >= e.tx && tx < e.tx + e.width && ty >= e.ty && ty < e.ty + e.height;
         });
 
-        const infantryTypes = ['light_infantry', 'heavy_trooper', 'rocket_infantry', 'commando'];
+        const infantryTypes = ['light_infantry', 'heavy_trooper', 'rocket_infantry', 'commando', 'devastator'];
 
         // Generate spread positions for group movement
         const spreadPositions = this._getFormationPositions(tx, ty, selected.length);
@@ -960,7 +960,7 @@ class Game {
 
         // Dust trails for moving vehicles & smoke for damaged buildings
         for (const entity of this.entities) {
-            if (entity.isUnit && entity.moving && entity.type !== 'light_infantry' && entity.type !== 'heavy_trooper' && entity.type !== 'rocket_infantry' && entity.type !== 'commando' && entity.type !== 'ornithopter') {
+            if (entity.isUnit && entity.moving && entity.type !== 'light_infantry' && entity.type !== 'heavy_trooper' && entity.type !== 'rocket_infantry' && entity.type !== 'commando' && entity.type !== 'devastator' && entity.type !== 'ornithopter') {
                 // Only show dust trails if the tile is visible (not in fog/shroud)
                 if (this.map.fogOfWar[entity.ty] && this.map.fogOfWar[entity.ty][entity.tx] && Math.random() < 0.3) {
                     this.particles.addDustTrail(entity.x, entity.y);

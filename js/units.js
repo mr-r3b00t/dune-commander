@@ -27,7 +27,7 @@ class Unit extends Entity {
         this.turretDirection = Math.PI; // independent turret facing (for tanks)
         this.turretTargetDir = Math.PI;
         // Turn speed varies by unit type (infantry fast, heavy tanks slow)
-        const isInfantry = (type === 'light_infantry' || type === 'heavy_trooper' || type === 'rocket_infantry' || type === 'commando');
+        const isInfantry = (type === 'light_infantry' || type === 'heavy_trooper' || type === 'rocket_infantry' || type === 'commando' || type === 'devastator');
         const isHeavy = (type === 'siege_tank' || type === 'harvester' || type === 'mcv');
         this.turnSpeed = isInfantry ? 10 : isHeavy ? 4 : 6; // radians per second (body)
         this.turretTurnSpeed = 8; // turret rotates faster than body
@@ -1042,6 +1042,7 @@ class Unit extends Entity {
             case 'heavy_trooper': return 'shoot_rocket';
             case 'rocket_infantry': return 'shoot_rocket';
             case 'commando': return 'shoot_sniper';
+            case 'devastator': return 'shoot_cannon';
             case 'ornithopter': return 'shoot_machinegun';
             case 'trike': return 'shoot_machinegun';
             case 'quad': return 'shoot_machinegun';
@@ -1103,6 +1104,9 @@ class Unit extends Entity {
             case 'commando':
                 SpriteRenderer.drawCommando(ctx, screenX, screenY, this.direction, colors);
                 break;
+            case 'devastator':
+                SpriteRenderer.drawDevastator(ctx, screenX, screenY, this.direction, colors);
+                break;
             case 'ornithopter':
                 const landed = this.state === 'rearming' && this.flyHeight < 1;
                 SpriteRenderer.drawOrnithopter(ctx, screenX, screenY - (this.flyHeight || 0), this.direction, colors, landed);
@@ -1116,7 +1120,7 @@ class Unit extends Entity {
 
         // Damage overlay - infantry get blood/wounds, vehicles get fire/smoke
         const hpRatio = this.hp / this.maxHp;
-        const isInfantryType = (this.type === 'light_infantry' || this.type === 'heavy_trooper' || this.type === 'rocket_infantry' || this.type === 'commando');
+        const isInfantryType = (this.type === 'light_infantry' || this.type === 'heavy_trooper' || this.type === 'rocket_infantry' || this.type === 'commando' || this.type === 'devastator');
         if (isInfantryType) {
             SpriteRenderer._infantryDamageOverlay(ctx, screenX, screenY, size, size, hpRatio);
         } else {
