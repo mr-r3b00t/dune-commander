@@ -55,6 +55,19 @@ class Projectile {
             this.trailColors = ['rgba(255, 160, 50, 0.5)', 'rgba(200, 100, 20, 0.3)', 'rgba(100, 50, 10, 0.1)'];
             this.smokeTrail = true;
             this.arcHeight = 0;
+        } else if (sourceType === 'mg_turret') {
+            // Machine gun burst - rapid small rounds
+            this.type = 'bullet';
+            this.speed = 10;
+            this.size = 1;
+            this.glowSize = 3;
+            this.trailWidth = 0.7;
+            this.maxTrailLength = 4;
+            this.headColor = '#ffee66';
+            this.glowColor = 'rgba(255, 240, 80, 0.3)';
+            this.trailColors = ['rgba(255, 240, 80, 0.3)', 'rgba(255, 200, 40, 0.15)', 'rgba(200, 150, 0, 0.05)'];
+            this.smokeTrail = false;
+            this.arcHeight = 0;
         } else if (sourceType === 'commando') {
             // Sniper round - very fast, thin tracer, long trail
             this.type = 'sniper';

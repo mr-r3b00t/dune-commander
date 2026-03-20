@@ -2846,6 +2846,85 @@ const SpriteRenderer = {
         ctx.restore();
     },
 
+    drawMGTurret(ctx, x, y, w, h, colors, turretAngle) {
+        ctx.save();
+        ctx.translate(x, y);
+
+        this._shadow(ctx, 0, 3, 12, 6, 0.2);
+
+        // Small concrete base
+        const baseGrad = ctx.createRadialGradient(-1, 0, 0, 0, 1, 11);
+        baseGrad.addColorStop(0, '#999');
+        baseGrad.addColorStop(0.5, '#777');
+        baseGrad.addColorStop(1, '#555');
+        ctx.fillStyle = baseGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, 1, 11, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Base rim
+        ctx.fillStyle = '#666';
+        ctx.beginPath();
+        ctx.ellipse(0, 2, 11, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#888';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 10, 6, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Small turret housing
+        const tGrad = ctx.createRadialGradient(-1, -3, 0, 0, -2, 7);
+        tGrad.addColorStop(0, this._lighten(colors.primary, 0.3));
+        tGrad.addColorStop(0.5, colors.primary);
+        tGrad.addColorStop(1, this._darken(colors.primary, 0.15));
+        ctx.fillStyle = tGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, -2, 7, 4.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Turret top
+        ctx.fillStyle = this._darken(colors.dark, 0.1);
+        ctx.beginPath();
+        ctx.ellipse(0, -3.5, 6, 3.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = this._lighten(colors.primary, 0.2);
+        ctx.beginPath();
+        ctx.ellipse(0, -4.5, 5.5, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Twin MG barrels
+        const angle = turretAngle || 0;
+        for (const offset of [-2, 2]) {
+            const ox = Math.cos(angle) * offset;
+            const oy = Math.sin(angle) * offset * 0.5;
+            const bLen = 13;
+            const bx = Math.sin(angle) * bLen + ox;
+            const by = -Math.cos(angle) * bLen * 0.5 - 4.5 + oy;
+
+            // Barrel
+            ctx.strokeStyle = '#444';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(ox, -4.5 + oy);
+            ctx.lineTo(bx, by);
+            ctx.stroke();
+
+            // Muzzle
+            ctx.fillStyle = '#222';
+            ctx.beginPath();
+            ctx.arc(bx, by, 1, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Ammo belt detail
+        ctx.fillStyle = '#aa8833';
+        ctx.fillRect(-3, -2, 6, 1.5);
+
+        // Status light (fast blink for rapid fire)
+        this._blinkLight(ctx, 0, -5, 0.8, '#ffaa00', 400);
+
+        ctx.restore();
+    },
+
     drawTurret(ctx, x, y, w, h, colors, turretAngle) {
         ctx.save();
         ctx.translate(x, y);

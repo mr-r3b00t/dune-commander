@@ -11,13 +11,24 @@ class UIManager {
         this.setupTabs();
         this.updateBuildList();
 
-        // Sell button — use a global function since innerHTML is rewritten every frame
-        window._sellBuilding = () => {
-            const selected = this.game.entities.filter(e => e.selected);
-            if (selected.length === 1 && selected[0].isBuilding) {
-                this.sellBuilding(selected[0]);
+        // Sell button — event delegation on info panel since innerHTML is rewritten every frame
+        const infoPanel = document.getElementById('selection-info');
+        infoPanel.addEventListener('mousedown', (evt) => {
+            if (evt.target && evt.target.id === 'sell-btn') {
+                evt.stopPropagation();
+                evt.preventDefault();
+                const selected = this.game.entities.filter(e => e.selected);
+                if (selected.length === 1 && selected[0].isBuilding) {
+                    this.sellBuilding(selected[0]);
+                }
             }
-        };
+            if (evt.target && evt.target.id === 'deploy-btn') {
+                evt.stopPropagation();
+                evt.preventDefault();
+                const mcv = this.game.entities.find(e => e.selected && e.type === 'mcv' && e.owner === 'player');
+                if (mcv) this.game.deployMCV(mcv);
+            }
+        });
     }
 
     setupTabs() {
@@ -473,7 +484,7 @@ class UIManager {
         }
 
         // Show clearance zone below building (not for turrets/walls)
-        const noClearance = (this.placingBuilding === 'turret' || this.placingBuilding === 'rocket_turret' || this.placingBuilding === 'wall');
+        const noClearance = (this.placingBuilding === 'mg_turret' || this.placingBuilding === 'turret' || this.placingBuilding === 'rocket_turret' || this.placingBuilding === 'wall');
         const clearY = ty + def.height;
         if (clearY < MAP_HEIGHT && !noClearance) {
             for (let dx = 0; dx < def.width; dx++) {
@@ -550,6 +561,9 @@ class UIManager {
             if (e.isUnit && e.type === 'harvester') {
                 html += `<br>Spice: ${Math.floor(e.spiceCarried)}/${e.capacity}`;
                 html += `<br>State: ${e.state}`;
+            } else if (e.isUnit && e.type === 'mcv') {
+                html += `<br>State: ${e.state}`;
+                html += `<br><button id="deploy-btn" style="margin-top:4px;background:#2a5a2a;color:#e0d5a0;border:1px solid #4a4;padding:2px 10px;cursor:pointer;font-family:monospace;font-size:10px;">DEPLOY [D]</button>`;
             } else if (e.isUnit && e.type === 'ornithopter') {
                 html += `<br>Gun: ${e.gunAmmo}/${e.maxGunAmmo} | Missiles: ${e.missileAmmo}/${e.maxMissileAmmo}`;
                 html += `<br>State: ${e.state}`;
@@ -565,7 +579,7 @@ class UIManager {
             }
             if (e.isBuilding && e.owner === 'player' && e.type !== 'construction_yard') {
                 const sellPrice = Math.floor(BUILDING_DEFS[e.type].cost / 3);
-                html += `<br><button id="sell-btn" onclick="event.stopPropagation(); window._sellBuilding();" style="margin-top:4px;background:#6a2020;color:#e0d5a0;border:1px solid #a44;padding:2px 10px;cursor:pointer;font-family:monospace;font-size:10px;">SELL (💰${sellPrice})</button>`;
+                html += `<br><button id="sell-btn" style="margin-top:4px;background:#6a2020;color:#e0d5a0;border:1px solid #a44;padding:2px 10px;cursor:pointer;font-family:monospace;font-size:10px;">SELL (💰${sellPrice})</button>`;
             }
             info.innerHTML = html;
         } else {

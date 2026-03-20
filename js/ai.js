@@ -9,8 +9,8 @@ class AIPlayer {
         this.state = 'building'; // building, attacking
         this.buildOrder = [
             'wind_trap', 'refinery', 'barracks', 'wind_trap',
-            'light_factory', 'refinery', 'heavy_factory', 'turret', 'turret',
-            'helipad'
+            'light_factory', 'refinery', 'heavy_factory', 'mg_turret', 'turret', 'turret',
+            'helipad', 'mg_turret'
         ];
         this.buildIndex = 0;
         // Harkonnen AI gets devastators in their build order
@@ -190,7 +190,7 @@ class AIPlayer {
         if (playerTargets.length === 0) return;
 
         // Prioritize: buildings first (turrets, then production, then others)
-        const turrets = playerTargets.filter(e => e.type === 'turret' || e.type === 'rocket_turret');
+        const turrets = playerTargets.filter(e => e.type === 'turret' || e.type === 'rocket_turret' || e.type === 'mg_turret');
         const buildings = playerTargets.filter(e => e.isBuilding && e.type !== 'turret' && e.type !== 'rocket_turret');
         const units = playerTargets.filter(e => e.isUnit);
 

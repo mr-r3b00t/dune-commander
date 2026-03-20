@@ -124,6 +124,21 @@ const BUILDING_DEFS = {
         requires: ['light_factory'],
         description: 'Builds heavy vehicles and tanks.'
     },
+    mg_turret: {
+        name: 'MG Turret',
+        icon: '🔫',
+        width: 1,
+        height: 1,
+        cost: 150,
+        buildTime: 2500,
+        hp: 350,
+        power: -5,
+        requires: ['barracks'],
+        description: 'Rapid-fire machine gun turret. Effective vs infantry.',
+        attackRange: 4,
+        attackDamage: 6,
+        attackSpeed: 400
+    },
     turret: {
         name: 'Gun Turret',
         icon: '🗼',

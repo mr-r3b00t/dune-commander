@@ -48,7 +48,7 @@ class Building extends Entity {
         // Turret rotation (smooth tracking)
         this.turretAngle = 0; // current barrel angle in radians
         this.turretTargetAngle = 0; // desired angle toward target
-        this.turretTurnSpeed = (type === 'rocket_turret') ? 4 : 5; // radians per second
+        this.turretTurnSpeed = (type === 'rocket_turret') ? 5 : (type === 'mg_turret') ? 10 : 7; // radians per second
         this.turretOnTarget = false; // true when barrel is close enough to fire
     }
 
@@ -97,7 +97,7 @@ class Building extends Entity {
         // Reveal fog - radar buildings reveal a much larger area
         const cx = this.tx + Math.floor(this.width / 2);
         const cy = this.ty + Math.floor(this.height / 2);
-        const revealRadius = this.radarRadius > 0 ? this.radarRadius : 8;
+        const revealRadius = this.radarRadius > 0 ? this.radarRadius : 10;
         game.map.revealArea(cx, cy, revealRadius, this.owner);
     }
 
@@ -275,7 +275,11 @@ class Building extends Entity {
                 this.turretOnTarget = true;
             } else {
                 this.turretAngle += Math.sign(angleDiff) * maxRot;
-                this.turretOnTarget = Math.abs(angleDiff) < 0.05; // ~3 degrees — turret must be very close to aimed
+                // Recalculate remaining diff after this frame's rotation
+                let remaining = this.turretTargetAngle - this.turretAngle;
+                while (remaining > Math.PI) remaining -= Math.PI * 2;
+                while (remaining < -Math.PI) remaining += Math.PI * 2;
+                this.turretOnTarget = Math.abs(remaining) < 0.08; // ~4.5 degrees tolerance
             }
         } else {
             this.turretOnTarget = false;
@@ -310,8 +314,8 @@ class Building extends Entity {
                         this.target = null;
                     }
                 } else {
-                    game.addProjectile(this.x, this.y, this.target, this.attackDamage, this.owner);
-                    game.audio.play(this.type === 'rocket_turret' ? 'shoot_rocket' : 'shoot_turret');
+                    game.addProjectile(this.x, this.y, this.target, this.attackDamage, this.owner, this.type);
+                    game.audio.play(this.type === 'rocket_turret' ? 'shoot_rocket' : this.type === 'mg_turret' ? 'shoot_machinegun' : 'shoot_turret');
                 }
             } else {
                 this.target = null;
@@ -395,6 +399,9 @@ class Building extends Entity {
                 break;
             case 'heavy_factory':
                 SpriteRenderer.drawHeavyFactory(ctx, screenX, screenY, w, h, colors);
+                break;
+            case 'mg_turret':
+                SpriteRenderer.drawMGTurret(ctx, screenX, screenY, w, h, colors, this.turretAngle);
                 break;
             case 'turret':
                 SpriteRenderer.drawTurret(ctx, screenX, screenY, w, h, colors, this.turretAngle);

@@ -69,7 +69,7 @@ class Unit extends Entity {
         const fogOwner = (this.owner === 'fremen' && game.playerHouse === 'atreides') ? 'player'
             : (this.owner === 'sardaukar' && game.playerHouse === 'harkonnen') ? 'player'
             : this.owner;
-        game.map.revealArea(this.tx, this.ty, this.isAircraft ? 8 : 6, fogOwner);
+        game.map.revealArea(this.tx, this.ty, this.isAircraft ? 12 : 8, fogOwner);
 
         // Aircraft use direct flight, not pathfinding
         if (this.isAircraft) {

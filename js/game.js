@@ -204,6 +204,11 @@ class Game {
                     u.moving = false;
                 });
             }
+            if (e.key === 'd' || e.key === 'D') {
+                // Deploy MCV into Construction Yard
+                const mcv = this.entities.find(e => e.selected && e.type === 'mcv' && e.owner === 'player');
+                if (mcv) this.deployMCV(mcv);
+            }
             if (e.key === 'm' || e.key === 'M') {
                 const playing = this.audio.toggleMusic();
                 this.ui.showStatus(playing ? '🎵 Music ON' : '🔇 Music OFF');
@@ -457,6 +462,59 @@ class Game {
 
         // Move command particle
         this.particles.addSandPuff(worldX, worldY);
+    }
+
+    deployMCV(mcv) {
+        if (!mcv || mcv.type !== 'mcv' || mcv.owner !== 'player') return;
+
+        const def = BUILDING_DEFS['construction_yard'];
+        // Center the 3x3 building on the MCV's tile
+        const tx = mcv.tx - 1;
+        const ty = mcv.ty - 1;
+
+        // Remove the MCV first so its occupied tile doesn't block the check
+        const savedTx = mcv.tx, savedTy = mcv.ty;
+        this.removeEntity(mcv);
+
+        // Check if there's room to place a construction yard
+        if (!this.map.canBuildAt(tx, ty, def.width, def.height)) {
+            // Re-add the MCV since we can't deploy
+            const restored = new Unit(savedTx, savedTy, 'player', 'mcv');
+            restored.selected = true;
+            this.addEntity(restored);
+            this.ui.showStatus('Cannot deploy here — need 3×3 rock terrain!');
+            this.audio.speak('Cannot deploy here');
+            return;
+        }
+
+        // Place the construction yard
+        const cy = new Building(tx, ty, 'player', 'construction_yard');
+        cy.isConstructing = true;
+        cy.constructionProgress = 0;
+        this.addEntity(cy);
+        this.map.setOccupied(tx, ty, def.width, def.height, cy.id);
+        this.map.setBuildingClearance(tx, ty, def.width, def.height, cy.id, 'construction_yard');
+
+        // Animate construction (fast — 3 seconds)
+        const startTime = Date.now();
+        const gameRef = this;
+        const animate = () => {
+            if (cy.hp <= 0) return;
+            const elapsed = Date.now() - startTime;
+            cy.constructionProgress = Math.min(1, elapsed / 3000);
+            if (cy.constructionProgress >= 1) {
+                cy.isConstructing = false;
+                gameRef.audio.play('buildComplete');
+                gameRef.audio.speak('MCV deployed');
+            } else {
+                requestAnimationFrame(animate);
+            }
+        };
+        requestAnimationFrame(animate);
+
+        this.audio.play('place');
+        this.audio.speak('Deploying MCV');
+        this.ui.showStatus('MCV deploying into Construction Yard...');
     }
 
     _getFormationPositions(tx, ty, count) {
