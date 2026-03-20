@@ -185,7 +185,8 @@ class Game {
             }
         });
 
-        this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+        // Block browser context menu on the entire game UI
+        document.addEventListener('contextmenu', (e) => e.preventDefault());
 
         // Keyboard
         window.addEventListener('keydown', (e) => {
