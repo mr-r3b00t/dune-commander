@@ -87,23 +87,40 @@ class UIManager {
                 const hasFactory = this.game.entities.some(
                     e => e.type === def.buildAt && e.owner === 'player'
                 );
+
+                // Count how many of this unit are queued + building across all factories
+                let queuedCount = 0;
+                this.game.entities.forEach(e => {
+                    if (!e.isBuilding || e.owner !== 'player') return;
+                    if (e.currentBuild && e.currentBuild.type === key) queuedCount++;
+                    if (e.buildQueue) {
+                        e.buildQueue.forEach(q => { if (q.type === key) queuedCount++; });
+                    }
+                });
+
+                // Count existing alive units of this type
+                const aliveCount = this.game.entities.filter(
+                    e => e.type === key && e.owner === 'player' && e.hp > 0
+                ).length;
+
+                // Determine max allowed in queue
+                const maxQueue = def.unique ? 1 : 5;
+                const totalCount = queuedCount + aliveCount;
+
                 // Check unique unit limit
-                let atUniqueLimit = false;
+                let atLimit = false;
                 if (def.unique) {
-                    const exists = this.game.entities.some(
-                        e => e.type === key && e.owner === 'player' && e.hp > 0
-                    );
-                    const inQueue = this.game.entities.some(
-                        e => e.isBuilding && e.owner === 'player' && e.buildQueue &&
-                            e.buildQueue.some(q => q.type === key)
-                    );
-                    atUniqueLimit = exists || inQueue;
+                    atLimit = totalCount >= 1;
+                } else {
+                    atLimit = queuedCount >= maxQueue;
                 }
-                const canBuild = available && affordable && hasFactory && !atUniqueLimit;
+                const canBuild = available && affordable && hasFactory && !atLimit;
 
                 let statusText = `${def.cost} credits`;
-                if (atUniqueLimit) {
-                    statusText = `LIMIT REACHED (1 max)`;
+                if (def.unique && totalCount >= 1) {
+                    statusText = 'LIMIT REACHED (1 max)';
+                } else if (queuedCount >= maxQueue) {
+                    statusText = 'QUEUE FULL (5 max)';
                 } else if (!hasFactory && available) {
                     const factoryDef = BUILDING_DEFS[def.buildAt];
                     statusText = `Needs: ${factoryDef ? factoryDef.name : def.buildAt}`;
@@ -116,8 +133,13 @@ class UIManager {
 
                 const item = document.createElement('div');
                 item.className = 'build-item' + (!canBuild ? ' disabled' : '');
+
+                const countBadge = queuedCount > 0
+                    ? `<span class="build-queue-count">${queuedCount}</span>`
+                    : '';
+
                 item.innerHTML = `
-                    <div class="build-item-icon">${def.icon}</div>
+                    <div class="build-item-icon">${def.icon}${countBadge}</div>
                     <div class="build-item-info">
                         <div class="build-item-name">${def.name}</div>
                         <div class="build-item-cost">${statusText}</div>
@@ -162,21 +184,32 @@ class UIManager {
             e => e.type === def.buildAt && e.owner === 'player'
         );
 
-        // Unique unit check (e.g. commando - only 1 allowed)
-        if (def.unique) {
-            const existing = this.game.entities.some(
-                e => e.type === unitType && e.owner === 'player' && e.hp > 0
-            );
-            // Also check build queues
-            const inQueue = this.game.entities.some(
-                e => e.isBuilding && e.owner === 'player' && e.buildQueue &&
-                    e.buildQueue.some(q => q.type === unitType)
-            );
-            if (existing || inQueue) {
-                this.showStatus(`Only one ${def.name} allowed at a time!`);
-                this.game.audio.speak('Cannot comply');
-                return;
+        // Count queued across all factories
+        let queuedCount = 0;
+        this.game.entities.forEach(e => {
+            if (!e.isBuilding || e.owner !== 'player') return;
+            if (e.currentBuild && e.currentBuild.type === unitType) queuedCount++;
+            if (e.buildQueue) {
+                e.buildQueue.forEach(q => { if (q.type === unitType) queuedCount++; });
             }
+        });
+
+        const aliveCount = this.game.entities.filter(
+            e => e.type === unitType && e.owner === 'player' && e.hp > 0
+        ).length;
+
+        // Unique unit check (e.g. commando - only 1 allowed)
+        if (def.unique && (aliveCount + queuedCount) >= 1) {
+            this.showStatus(`Only one ${def.name} allowed at a time!`);
+            this.game.audio.speak('Cannot comply');
+            return;
+        }
+
+        // Queue limit: 5 per unit type
+        if (!def.unique && queuedCount >= 5) {
+            this.showStatus(`Queue full for ${def.name} (5 max)`);
+            this.game.audio.speak('Cannot comply');
+            return;
         }
 
         if (factory && this.game.credits >= def.cost) {

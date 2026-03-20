@@ -144,6 +144,23 @@ body {
     align-items: center;
     justify-content: center;
     font-size: 18px;
+    position: relative;
+}
+
+.build-queue-count {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #e0a030;
+    color: #000;
+    font-size: 9px;
+    font-weight: bold;
+    min-width: 14px;
+    height: 14px;
+    line-height: 14px;
+    text-align: center;
+    border-radius: 7px;
+    padding: 0 2px;
 }
 
 .build-item-info {

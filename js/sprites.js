@@ -1005,37 +1005,96 @@ const SpriteRenderer = {
         ctx.fillRect(-1.5, -10.3 + breathe, 0.8, 0.6);
         ctx.fillRect(0.8, -10.3 + breathe, 0.8, 0.6);
 
-        // Weapon: sniper rifle with scope (longer, more detailed)
+        // Weapon: long sniper rifle with scope and bipod
         const wx = Math.sin(dir) * 4;
         const wy = -Math.cos(dir) * 2;
         ctx.save();
         ctx.translate(wx + 3.5, -5 + wy + breathe);
         ctx.rotate(dir * 0.25);
-        // Rifle body
+
+        // Rifle body (long barrel)
         const rifleGrad = ctx.createLinearGradient(-1, 0, 2, 0);
-        rifleGrad.addColorStop(0, '#333');
-        rifleGrad.addColorStop(0.5, '#555');
-        rifleGrad.addColorStop(1, '#2a2a2a');
+        rifleGrad.addColorStop(0, '#2a2a2a');
+        rifleGrad.addColorStop(0.3, '#444');
+        rifleGrad.addColorStop(0.7, '#3a3a3a');
+        rifleGrad.addColorStop(1, '#222');
         ctx.fillStyle = rifleGrad;
-        ctx.fillRect(-0.5, 2, 2, -14);
-        // Stock
-        ctx.fillStyle = '#3a2a15';
-        ctx.fillRect(-0.8, 2, 2.5, 3);
-        // Scope
-        ctx.fillStyle = '#222';
-        ctx.fillRect(-0.3, -8, 1.5, 4);
-        // Scope lens glint
-        ctx.save();
-        ctx.shadowColor = '#6688ff';
-        ctx.shadowBlur = 2;
-        ctx.fillStyle = '#4466cc';
-        ctx.beginPath();
-        ctx.arc(0.5, -8, 0.8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-        // Suppressor
+        ctx.fillRect(-0.6, 3, 2.2, -20); // longer barrel
+
+        // Wooden stock with cheek rest
+        const stockGrad = ctx.createLinearGradient(-1, 2, 2, 6);
+        stockGrad.addColorStop(0, '#5a3a18');
+        stockGrad.addColorStop(0.5, '#4a2a12');
+        stockGrad.addColorStop(1, '#3a2010');
+        ctx.fillStyle = stockGrad;
+        ctx.fillRect(-1, 2, 3, 4);
+        // Rubber butt pad
         ctx.fillStyle = '#1a1a1a';
-        ctx.fillRect(-0.2, -14, 1.4, 3);
+        ctx.fillRect(-1, 5.5, 3, 0.8);
+
+        // Trigger guard
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.arc(0.5, 1, 1.2, 0, Math.PI);
+        ctx.stroke();
+
+        // Magazine
+        ctx.fillStyle = '#333';
+        ctx.fillRect(-0.3, -1, 1.8, 3);
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 0.3;
+        ctx.strokeRect(-0.3, -1, 1.8, 3);
+
+        // Scope mount rail
+        ctx.fillStyle = '#3a3a3a';
+        ctx.fillRect(-0.2, -12, 1.4, 6);
+
+        // Scope body (large, long)
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(-0.5, -11, 2, 5.5);
+        // Scope tube
+        ctx.fillStyle = '#2a2a2a';
+        ctx.beginPath();
+        ctx.ellipse(0.5, -11, 1.2, 1.2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(0.5, -5.5, 1, 1, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Scope lens (front) — blue-purple glint
+        const lensGlow = Math.sin(t / 600) * 0.15 + 0.85;
+        ctx.fillStyle = `rgba(80,120,220,${lensGlow})`;
+        ctx.beginPath();
+        ctx.arc(0.5, -11.2, 0.9, 0, Math.PI * 2);
+        ctx.fill();
+        // Lens highlight
+        ctx.fillStyle = `rgba(180,200,255,${lensGlow * 0.5})`;
+        ctx.beginPath();
+        ctx.arc(0.2, -11.5, 0.3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Long suppressor with vents
+        ctx.fillStyle = '#111';
+        ctx.fillRect(-0.3, -17, 1.6, 4);
+        // Vent holes
+        ctx.fillStyle = '#222';
+        ctx.fillRect(0, -16.5, 1, 0.4);
+        ctx.fillRect(0, -15.5, 1, 0.4);
+        ctx.fillRect(0, -14.5, 1, 0.4);
+
+        // Bipod legs (folded along barrel)
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 0.6;
+        ctx.beginPath();
+        ctx.moveTo(-0.5, -4);
+        ctx.lineTo(-1.5, -1);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(1.5, -4);
+        ctx.lineTo(2.5, -1);
+        ctx.stroke();
+
         ctx.restore();
 
         // C4/explosives pack on back

@@ -355,13 +355,13 @@ const UNIT_DEFS = {
         buildTime: 12000,
         hp: 120,
         speed: 1.8,
-        attackRange: 6,
-        attackDamage: 40,
-        attackSpeed: 1500,
+        attackRange: 9,
+        attackDamage: 65,
+        attackSpeed: 2500,
         buildAt: 'barracks',
         requires: ['barracks', 'heavy_factory'],
         unique: true,
-        description: 'Elite commando. Extremely powerful. Only one allowed at a time.'
+        description: 'Elite sniper commando. Devastating long-range shots. Only one allowed.'
     }
 };
 

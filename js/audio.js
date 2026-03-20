@@ -469,6 +469,17 @@ class AudioManager {
                 this.playTone(60, 0.15, 'square', 0.2, 0.03);
                 break;
 
+            case 'shoot_sniper':
+                // Sniper rifle - sharp high crack with echo
+                if (this._throttle('shoot_sniper', 300)) break;
+                this.playNoise(0.06, 0.25);
+                this.playTone(2200, 0.015, 'square', 0.3);
+                this.playTone(800, 0.04, 'sawtooth', 0.15, 0.02);
+                // Echo/reverb tail
+                this.playNoise(0.02, 0.4, 0.1);
+                this.playTone(600, 0.03, 'sine', 0.06, 0.15);
+                break;
+
             case 'shoot_machinegun':
                 // Light vehicle MG - rapid rattle
                 if (this._throttle('shoot_machinegun', 60)) break;

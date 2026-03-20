@@ -88,6 +88,60 @@ class Unit extends Entity {
             case 'unloading':
                 this.updateUnloading(game);
                 break;
+            case 'moving_to_repair':
+                // Moving toward repair bay — check if arrived
+                if (!this.path || this.pathIndex >= this.path.length) {
+                    this.moving = false;
+                    if (this.repairBayTarget && this.repairBayTarget.hp > 0) {
+                        this.state = 'waiting_for_repair';
+                        if (this.owner === 'player') {
+                            game.audio.speak('Awaiting repairs');
+                        }
+                    } else {
+                        this.state = 'idle';
+                    }
+                }
+                break;
+            case 'waiting_for_repair':
+                // Stay put until fully repaired by the repair bay
+                this.path = null;
+                this.moving = false;
+                if (this.hp >= this.maxHp) {
+                    this.repairBayTarget = null;
+                    this.state = 'idle';
+                    if (this.owner === 'player') {
+                        game.audio.speak('Repairs complete');
+                        game.ui.showStatus('Vehicle repaired — resuming duties');
+                    }
+                }
+                break;
+            case 'moving_to_heal':
+                // Moving toward hospital — check if arrived
+                if (!this.path || this.pathIndex >= this.path.length) {
+                    this.moving = false;
+                    if (this.healTarget && this.healTarget.hp > 0) {
+                        this.state = 'waiting_for_heal';
+                        if (this.owner === 'player') {
+                            game.audio.speak('Awaiting medical attention');
+                        }
+                    } else {
+                        this.state = 'idle';
+                    }
+                }
+                break;
+            case 'waiting_for_heal':
+                // Stay put until fully healed by the hospital
+                this.path = null;
+                this.moving = false;
+                if (this.hp >= this.maxHp) {
+                    this.healTarget = null;
+                    this.state = 'idle';
+                    if (this.owner === 'player') {
+                        game.audio.speak('Fully healed');
+                        game.ui.showStatus(`${this.name} healed — ready for action`);
+                    }
+                }
+                break;
         }
     }
 
@@ -319,7 +373,7 @@ class Unit extends Entity {
             const now = Date.now();
             if (now - this.lastAttackTime >= this.attackSpeed) {
                 this.lastAttackTime = now;
-                game.addProjectile(this.x, this.y, this.target, this.attackDamage, this.owner);
+                game.addProjectile(this.x, this.y, this.target, this.attackDamage, this.owner, this.type);
                 // Weapon-specific firing sound
                 game.audio.play(this._getWeaponSound());
             }
@@ -585,7 +639,7 @@ class Unit extends Entity {
             case 'light_infantry': return 'shoot_rifle';
             case 'heavy_trooper': return 'shoot_rocket';
             case 'rocket_infantry': return 'shoot_rocket';
-            case 'commando': return 'shoot_cannon';
+            case 'commando': return 'shoot_sniper';
             case 'trike': return 'shoot_machinegun';
             case 'quad': return 'shoot_machinegun';
             case 'tank':
@@ -711,6 +765,45 @@ class Unit extends Entity {
                 ctx.fillStyle = '#8cf';
                 ctx.textAlign = 'center';
                 ctx.fillText('RETURNING', screenX, barY + barH + 9);
+            } else if (this.state === 'moving_to_repair') {
+                ctx.font = '9px monospace';
+                ctx.fillStyle = '#0f0';
+                ctx.textAlign = 'center';
+                ctx.fillText('TO REPAIR', screenX, barY + barH + 9);
+            } else if (this.state === 'waiting_for_repair') {
+                ctx.font = '9px monospace';
+                const pulse = Math.sin(Date.now() / 300) > 0 ? '#0f0' : '#0a0';
+                ctx.fillStyle = pulse;
+                ctx.textAlign = 'center';
+                ctx.fillText('REPAIRING', screenX, barY + barH + 9);
+            }
+        }
+
+        // Heal/repair state labels for non-harvester units
+        if (this.type !== 'harvester') {
+            const labelY = screenY + TILE_SIZE / 2 + 8;
+            if (this.state === 'moving_to_heal') {
+                ctx.font = '9px monospace';
+                ctx.fillStyle = '#0f0';
+                ctx.textAlign = 'center';
+                ctx.fillText('TO HOSPITAL', screenX, labelY);
+            } else if (this.state === 'waiting_for_heal') {
+                ctx.font = '9px monospace';
+                const pulse = Math.sin(Date.now() / 300) > 0 ? '#0f0' : '#0a0';
+                ctx.fillStyle = pulse;
+                ctx.textAlign = 'center';
+                ctx.fillText('HEALING', screenX, labelY);
+            } else if (this.state === 'moving_to_repair') {
+                ctx.font = '9px monospace';
+                ctx.fillStyle = '#0f0';
+                ctx.textAlign = 'center';
+                ctx.fillText('TO REPAIR', screenX, labelY);
+            } else if (this.state === 'waiting_for_repair') {
+                ctx.font = '9px monospace';
+                const pulse = Math.sin(Date.now() / 300) > 0 ? '#0f0' : '#0a0';
+                ctx.fillStyle = pulse;
+                ctx.textAlign = 'center';
+                ctx.fillText('REPAIRING', screenX, labelY);
             }
         }
     }

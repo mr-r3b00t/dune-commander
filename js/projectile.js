@@ -1,6 +1,6 @@
 // Projectile system - Premium quality with multiple projectile types
 class Projectile {
-    constructor(x, y, target, damage, owner) {
+    constructor(x, y, target, damage, owner, sourceType) {
         this.x = x;
         this.y = y;
         this.originX = x;
@@ -15,8 +15,21 @@ class Projectile {
         this.trail = [];
         this.maxTrailLength = 8;
 
-        // Determine projectile type based on damage
-        if (damage >= 40) {
+        // Determine projectile type based on source unit or damage
+        if (sourceType === 'commando') {
+            // Sniper round - very fast, thin tracer, long trail
+            this.type = 'sniper';
+            this.speed = 14;
+            this.size = 1;
+            this.glowSize = 3;
+            this.trailWidth = 0.8;
+            this.maxTrailLength = 16;
+            this.headColor = '#ffffff';
+            this.glowColor = 'rgba(200, 220, 255, 0.4)';
+            this.trailColors = ['rgba(200, 220, 255, 0.5)', 'rgba(150, 180, 255, 0.3)', 'rgba(100, 130, 200, 0.1)'];
+            this.smokeTrail = false;
+            this.arcHeight = 0;
+        } else if (damage >= 40) {
             // Siege shell - heavy artillery
             this.type = 'siege';
             this.speed = 4;
@@ -128,7 +141,9 @@ class Projectile {
 
             // Add impact sparks for all projectile types
             if (game.particles) {
-                if (this.type === 'bullet') {
+                if (this.type === 'sniper') {
+                    game.particles.addSparks(this.x, this.y, 4);
+                } else if (this.type === 'bullet') {
                     game.particles.addSparks(this.x, this.y, 3);
                 } else if (this.type === 'cannon') {
                     game.particles.addSparks(this.x, this.y, 6);

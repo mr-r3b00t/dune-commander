@@ -356,6 +356,20 @@ class Game {
             return tx >= e.tx && tx < e.tx + e.width && ty >= e.ty && ty < e.ty + e.height;
         });
 
+        // Check if right-clicked on a friendly repair bay
+        const clickedRepairBay = this.entities.find(e => {
+            if (e.type !== 'repair_bay' || e.owner !== 'player') return false;
+            return tx >= e.tx && tx < e.tx + e.width && ty >= e.ty && ty < e.ty + e.height;
+        });
+
+        // Check if right-clicked on a friendly hospital
+        const clickedHospital = this.entities.find(e => {
+            if (e.type !== 'hospital' || e.owner !== 'player') return false;
+            return tx >= e.tx && tx < e.tx + e.width && ty >= e.ty && ty < e.ty + e.height;
+        });
+
+        const infantryTypes = ['light_infantry', 'heavy_trooper', 'rocket_infantry', 'commando'];
+
         // Generate spread positions for group movement
         const spreadPositions = this._getFormationPositions(tx, ty, selected.length);
 
@@ -366,8 +380,16 @@ class Game {
             if (target && unit.attackRange > 0) {
                 unit.attackTarget(target, this);
             } else if (unit.type === 'harvester') {
+                // Harvesters: right-click on repair bay = go repair, then resume
+                if (clickedRepairBay && unit.hp < unit.maxHp) {
+                    const bayX = clickedRepairBay.tx + Math.floor(clickedRepairBay.width / 2);
+                    const bayY = clickedRepairBay.ty + Math.floor(clickedRepairBay.height / 2);
+                    unit.startPath(bayX, bayY, this);
+                    unit.state = 'moving_to_repair';
+                    unit.repairBayTarget = clickedRepairBay;
+                }
                 // Harvesters: right-click on refinery = return to unload
-                if (clickedRefinery && unit.spiceCarried > 0) {
+                else if (clickedRefinery && unit.spiceCarried > 0) {
                     const dropX = clickedRefinery.tx + 1;
                     const dropY = clickedRefinery.ty + 1;
                     unit.startPath(dropX, dropY, this);
@@ -382,6 +404,20 @@ class Game {
                 else {
                     unit.moveTo(dest.x, dest.y, this);
                 }
+            } else if (clickedHospital && infantryTypes.includes(unit.type) && unit.hp < unit.maxHp) {
+                // Infantry: right-click on hospital = go heal
+                const hospX = clickedHospital.tx + Math.floor(clickedHospital.width / 2);
+                const hospY = clickedHospital.ty + Math.floor(clickedHospital.height / 2);
+                unit.startPath(hospX, hospY, this);
+                unit.state = 'moving_to_heal';
+                unit.healTarget = clickedHospital;
+            } else if (clickedRepairBay && !infantryTypes.includes(unit.type) && unit.hp < unit.maxHp) {
+                // Vehicles: right-click on repair bay = go repair
+                const bayX = clickedRepairBay.tx + Math.floor(clickedRepairBay.width / 2);
+                const bayY = clickedRepairBay.ty + Math.floor(clickedRepairBay.height / 2);
+                unit.startPath(bayX, bayY, this);
+                unit.state = 'moving_to_repair';
+                unit.repairBayTarget = clickedRepairBay;
             } else {
                 unit.moveTo(dest.x, dest.y, this);
             }
@@ -481,8 +517,8 @@ class Game {
         }
     }
 
-    addProjectile(x, y, target, damage, owner) {
-        this.projectiles.push(new Projectile(x, y, target, damage, owner));
+    addProjectile(x, y, target, damage, owner, sourceType) {
+        this.projectiles.push(new Projectile(x, y, target, damage, owner, sourceType));
     }
 
     addExplosion(x, y, large) {
@@ -852,7 +888,7 @@ class Game {
 
         // Dust trails for moving vehicles & smoke for damaged buildings
         for (const entity of this.entities) {
-            if (entity.isUnit && entity.moving && entity.type !== 'light_infantry' && entity.type !== 'heavy_trooper') {
+            if (entity.isUnit && entity.moving && entity.type !== 'light_infantry' && entity.type !== 'heavy_trooper' && entity.type !== 'rocket_infantry' && entity.type !== 'commando') {
                 if (Math.random() < 0.3) {
                     this.particles.addDustTrail(entity.x, entity.y);
                 }
