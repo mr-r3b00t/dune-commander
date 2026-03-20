@@ -10,6 +10,16 @@ class UIManager {
 
         this.setupTabs();
         this.updateBuildList();
+
+        // Persistent sell button handler via event delegation
+        document.getElementById('selection-info').addEventListener('click', (evt) => {
+            if (evt.target && evt.target.id === 'sell-btn') {
+                const selected = this.game.entities.filter(e => e.selected);
+                if (selected.length === 1 && selected[0].isBuilding) {
+                    this.sellBuilding(selected[0]);
+                }
+            }
+        });
     }
 
     setupTabs() {
@@ -285,6 +295,29 @@ class UIManager {
             if (uDef) this.game.credits += uDef.cost;
         }
 
+        // Handle spice storage — if selling a silo, convert overflow spice to credits
+        if (def.storageCapacity && this.game.spiceStored > 0) {
+            // Calculate remaining capacity from other silos (excluding this one)
+            let remainingCapacity = 0;
+            for (const e of this.game.entities) {
+                if (e === building) continue;
+                if (e.isBuilding && e.owner === 'player') {
+                    const bDef = BUILDING_DEFS[e.type];
+                    if (bDef && bDef.storageCapacity) {
+                        remainingCapacity += bDef.storageCapacity;
+                    }
+                }
+            }
+            // Convert overflow spice to credits at 1.5x rate
+            if (this.game.spiceStored > remainingCapacity) {
+                const overflow = this.game.spiceStored - remainingCapacity;
+                const overflowCredits = Math.floor(overflow * 1.5);
+                this.game.credits += overflowCredits;
+                this.game.spiceStored = remainingCapacity;
+                this.showStatus(`${Math.floor(overflow)} excess spice converted to ${overflowCredits} credits`);
+            }
+        }
+
         this.game.credits += sellPrice;
         this.game.addExplosion(building.x, building.y, false);
         this.game.removeEntity(building);
@@ -514,13 +547,6 @@ class UIManager {
                 html += `<br><button id="sell-btn" style="margin-top:4px;background:#6a2020;color:#e0d5a0;border:1px solid #a44;padding:2px 10px;cursor:pointer;font-family:monospace;font-size:10px;">SELL (💰${sellPrice})</button>`;
             }
             info.innerHTML = html;
-            // Attach sell button handler
-            const sellBtn = document.getElementById('sell-btn');
-            if (sellBtn) {
-                sellBtn.addEventListener('click', () => {
-                    this.sellBuilding(e);
-                });
-            }
         } else {
             info.innerHTML = `<b>${selected.length} units selected</b>`;
         }
