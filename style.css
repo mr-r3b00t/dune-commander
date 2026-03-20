@@ -1,0 +1,300 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #000;
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+    color: #e0d5a0;
+    user-select: none;
+}
+
+#game-container {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+}
+
+#game-canvas {
+    flex: 1;
+    min-width: 0;
+    cursor: crosshair;
+}
+
+#sidebar {
+    width: 200px;
+    min-width: 200px;
+    flex-shrink: 0;
+    background: #1a1a2e;
+    border-left: 2px solid #4a3f2f;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#house-banner {
+    background: linear-gradient(135deg, #2a4a8a, #1a2a5a);
+    padding: 8px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    border-bottom: 2px solid #4a6aba;
+}
+
+#resource-panel {
+    padding: 8px;
+    border-bottom: 1px solid #333;
+}
+
+.resource {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+    font-size: 12px;
+}
+
+.resource-label {
+    color: #888;
+}
+
+#minimap-container {
+    padding: 8px;
+    border-bottom: 1px solid #333;
+}
+
+#minimap {
+    width: 184px;
+    height: 140px;
+    background: #2a1f0f;
+    border: 1px solid #555;
+    cursor: pointer;
+}
+
+#build-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#build-tabs {
+    display: flex;
+}
+
+.build-tab {
+    flex: 1;
+    padding: 6px;
+    background: #1a1a2e;
+    border: 1px solid #333;
+    color: #888;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    letter-spacing: 1px;
+}
+
+.build-tab.active {
+    background: #2a2a4e;
+    color: #e0d5a0;
+    border-bottom-color: transparent;
+}
+
+#build-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px;
+}
+
+.build-item {
+    display: flex;
+    align-items: center;
+    padding: 6px;
+    margin: 2px 0;
+    background: #222240;
+    border: 1px solid #333;
+    cursor: pointer;
+    font-size: 11px;
+    transition: background 0.2s;
+}
+
+.build-item:hover {
+    background: #2a2a5a;
+    border-color: #5a5a8a;
+}
+
+.build-item.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.build-item.building {
+    border-color: #aa8800;
+}
+
+.build-item-icon {
+    width: 32px;
+    height: 32px;
+    margin-right: 8px;
+    border: 1px solid #555;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+}
+
+.build-item-info {
+    flex: 1;
+}
+
+.build-item-name {
+    font-size: 10px;
+    font-weight: bold;
+}
+
+.build-item-cost {
+    font-size: 9px;
+    color: #aa8800;
+}
+
+.build-progress {
+    height: 3px;
+    background: #333;
+    margin-top: 3px;
+}
+
+.build-progress-fill {
+    height: 100%;
+    background: #aa8800;
+    transition: width 0.1s;
+}
+
+#info-panel {
+    padding: 8px;
+    border-top: 1px solid #333;
+    min-height: 60px;
+    font-size: 11px;
+}
+
+#selection-info {
+    line-height: 1.4;
+}
+
+/* Main Menu */
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.overlay.hidden {
+    display: none;
+}
+
+.menu-content {
+    text-align: center;
+}
+
+.menu-content h1 {
+    font-size: 48px;
+    color: #e0a030;
+    text-shadow: 0 0 30px rgba(224, 160, 48, 0.5);
+    letter-spacing: 8px;
+    margin-bottom: 8px;
+}
+
+.subtitle {
+    font-size: 16px;
+    color: #aa8800;
+    letter-spacing: 4px;
+    margin-bottom: 40px;
+}
+
+.house-select h2 {
+    font-size: 14px;
+    color: #888;
+    letter-spacing: 3px;
+    margin-bottom: 20px;
+}
+
+.houses {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+}
+
+.house-btn {
+    background: #1a1a2e;
+    border: 2px solid #333;
+    color: #e0d5a0;
+    padding: 20px 30px;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    transition: all 0.3s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-width: 160px;
+}
+
+.house-btn:hover {
+    border-color: #e0a030;
+    background: #2a2a4e;
+    transform: scale(1.05);
+}
+
+.house-btn span {
+    font-size: 16px;
+    font-weight: bold;
+    letter-spacing: 2px;
+}
+
+.house-btn small {
+    font-size: 10px;
+    color: #888;
+}
+
+.house-icon {
+    width: 50px;
+    height: 50px;
+    border: 2px solid #555;
+}
+
+.atreides-icon {
+    background: linear-gradient(135deg, #2a5a9a, #1a3a6a);
+    border-color: #4a7aca;
+}
+
+.harkonnen-icon {
+    background: linear-gradient(135deg, #8a2a2a, #5a1a1a);
+    border-color: #ca4a4a;
+}
+
+.ordos-icon {
+    background: linear-gradient(135deg, #2a8a3a, #1a5a2a);
+    border-color: #4aca5a;
+}
+
+/* Scrollbar */
+#build-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+#build-list::-webkit-scrollbar-track {
+    background: #111;
+}
+
+#build-list::-webkit-scrollbar-thumb {
+    background: #444;
+}

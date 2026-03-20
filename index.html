@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dune: Commander</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+        <div id="sidebar">
+            <div id="house-banner">
+                <span id="house-name">HOUSE ATREIDES</span>
+            </div>
+            <div id="resource-panel">
+                <div class="resource">
+                    <span class="resource-label">CREDITS</span>
+                    <span id="credits">1000</span>
+                </div>
+                <div class="resource">
+                    <span class="resource-label">SPICE</span>
+                    <span id="spice-stored">0</span>
+                </div>
+                <div class="resource">
+                    <span class="resource-label">POWER</span>
+                    <span id="power">0 / 0</span>
+                </div>
+            </div>
+            <div id="minimap-container">
+                <canvas id="minimap"></canvas>
+            </div>
+            <div id="build-panel">
+                <div id="build-tabs">
+                    <button class="build-tab active" data-tab="structures">STRUCTURES</button>
+                    <button class="build-tab" data-tab="units">UNITS</button>
+                </div>
+                <div id="build-list"></div>
+            </div>
+            <div id="info-panel">
+                <div id="selection-info"></div>
+            </div>
+            <div id="music-controls" style="padding: 6px 10px; border-top: 1px solid #444; display: flex; align-items: center; gap: 8px;">
+                <button id="music-toggle" style="background: #333; color: #cda; border: 1px solid #555; padding: 3px 10px; cursor: pointer; font-size: 12px; font-family: monospace;">🎵 Music: ON</button>
+                <span style="color: #888; font-size: 10px;">[M]</span>
+            </div>
+        </div>
+    </div>
+    <div id="main-menu" class="overlay">
+        <div class="menu-content">
+            <h1>DUNE: COMMANDER</h1>
+            <p class="subtitle">The Battle for Arrakis</p>
+            <div class="house-select">
+                <h2>SELECT YOUR HOUSE</h2>
+                <div class="houses">
+                    <button class="house-btn" data-house="atreides">
+                        <div class="house-icon atreides-icon"></div>
+                        <span>ATREIDES</span>
+                        <small>Honorable &amp; Defensive</small>
+                    </button>
+                    <button class="house-btn" data-house="harkonnen">
+                        <div class="house-icon harkonnen-icon"></div>
+                        <span>HARKONNEN</span>
+                        <small>Brutal &amp; Powerful</small>
+                    </button>
+                    <button class="house-btn" data-house="ordos">
+                        <div class="house-icon ordos-icon"></div>
+                        <span>ORDOS</span>
+                        <small>Cunning &amp; Stealthy</small>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="js/constants.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/pathfinding.js"></script>
+    <script src="js/entity.js"></script>
+    <script src="js/buildings.js"></script>
+    <script src="js/units.js"></script>
+    <script src="js/projectile.js"></script>
+    <script src="js/particles.js"></script>
+    <script src="js/ai.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/sprites.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
