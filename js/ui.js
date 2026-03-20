@@ -12,8 +12,14 @@ class UIManager {
         this.updateBuildList();
 
         // Persistent sell button handler via event delegation
-        document.getElementById('selection-info').addEventListener('click', (evt) => {
-            if (evt.target && evt.target.id === 'sell-btn') {
+        // Use mousedown instead of click — since updateSelectionInfo() rewrites innerHTML
+        // every frame, the button element gets destroyed between mousedown and mouseup,
+        // which prevents the 'click' event from ever firing.
+        document.getElementById('selection-info').addEventListener('mousedown', (evt) => {
+            const btn = evt.target.closest('#sell-btn');
+            if (btn) {
+                evt.preventDefault();
+                evt.stopPropagation();
                 const selected = this.game.entities.filter(e => e.selected);
                 if (selected.length === 1 && selected[0].isBuilding) {
                     this.sellBuilding(selected[0]);
