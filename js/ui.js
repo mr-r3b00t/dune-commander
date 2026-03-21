@@ -547,6 +547,12 @@ class UIManager {
         const powerEl = document.getElementById('power');
         powerEl.textContent = `${produced - consumed} / ${produced}`;
         powerEl.style.color = produced >= consumed ? '#0a0' : '#a00';
+
+        // Mission timer
+        const elapsed = Math.floor((Date.now() - this.game.gameStartTime) / 1000);
+        const mins = Math.floor(elapsed / 60);
+        const secs = elapsed % 60;
+        document.getElementById('mission-time').textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
     }
 
     updateSelectionInfo() {

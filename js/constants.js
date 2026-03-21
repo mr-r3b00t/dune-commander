@@ -213,8 +213,8 @@ const BUILDING_DEFS = {
         hp: 400,
         power: -30,
         requires: ['refinery'],
-        radarRadius: 20,
-        description: 'Reveals a large area of the map (radius 20).'
+        radarRadius: 60,
+        description: 'Reveals a large area of the map (radius 60).'
     },
     wall: {
         name: 'Wall',

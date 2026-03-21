@@ -329,9 +329,58 @@ class Unit extends Entity {
         // Check if next tile is blocked by another unit or building
         const occupant = game.map.occupied[next.y] && game.map.occupied[next.y][next.x];
         if (occupant && occupant !== this.id) {
-            // Is it a unit or a building blocking us?
             const blocker = game.entities.find(e => e.id === occupant);
-            const isBlockerMoving = blocker && blocker.isUnit && blocker.moving;
+            const isBlockerUnit = blocker && blocker.isUnit;
+            const isBlockerMoving = isBlockerUnit && blocker.moving;
+
+            // Detect mutual deadlock: two units facing each other head-on
+            const isMutualBlock = isBlockerUnit && blocker.path && blocker.path.length > blocker.pathIndex &&
+                blocker.path[blocker.pathIndex].x === this.tx && blocker.path[blocker.pathIndex].y === this.ty;
+
+            if (isMutualBlock) {
+                // Head-on deadlock — one unit yields by stepping aside
+                // Lower ID yields to avoid both yielding
+                if (this.id < blocker.id) {
+                    // Find a passable adjacent tile that's not the blocker's tile
+                    const sidesteps = [
+                        { x: this.tx + 1, y: this.ty }, { x: this.tx - 1, y: this.ty },
+                        { x: this.tx, y: this.ty + 1 }, { x: this.tx, y: this.ty - 1 },
+                        { x: this.tx + 1, y: this.ty + 1 }, { x: this.tx - 1, y: this.ty - 1 },
+                        { x: this.tx + 1, y: this.ty - 1 }, { x: this.tx - 1, y: this.ty + 1 }
+                    ];
+                    let stepped = false;
+                    for (const s of sidesteps) {
+                        if (s.x === next.x && s.y === next.y) continue; // don't step into blocker
+                        if (isInBounds(s.x, s.y) && game.map.isPassable(s.x, s.y)) {
+                            // Temporarily sidestep, then repath to original destination
+                            const destX = this.finalDestX !== undefined ? this.finalDestX : this.path[this.path.length - 1].x;
+                            const destY = this.finalDestY !== undefined ? this.finalDestY : this.path[this.path.length - 1].y;
+                            // Move to side tile first
+                            this.path = [{ x: this.tx, y: this.ty }, { x: s.x, y: s.y }];
+                            this.pathIndex = 1;
+                            this.moveProgress = 0;
+                            // Remember to repath after sidestep
+                            this._repathAfterSidestep = { x: destX, y: destY };
+                            stepped = true;
+                            break;
+                        }
+                    }
+                    if (!stepped) {
+                        // No room to sidestep — just wait
+                        if (!this._waitStart) this._waitStart = Date.now();
+                        if (Date.now() - this._waitStart < 1000) return;
+                        this._waitStart = null;
+                        this.path = null;
+                        this.moving = false;
+                    }
+                } else {
+                    // Higher ID waits briefly for the other to sidestep
+                    if (!this._waitStart) this._waitStart = Date.now();
+                    if (Date.now() - this._waitStart < 600) return;
+                    this._waitStart = null;
+                }
+                return;
+            }
 
             // If blocker is a moving unit, wait briefly then repath
             if (isBlockerMoving && (!this._waitStart || Date.now() - this._waitStart < 500)) {
@@ -340,13 +389,17 @@ class Unit extends Entity {
             }
             this._waitStart = null;
 
-            // Repath around the obstacle (max 3 retries to avoid infinite loops)
+            // Repath around the obstacle (max 5 retries)
             this.repathRetryCount = (this.repathRetryCount || 0) + 1;
-            if (this.repathRetryCount > 3) {
-                // Give up, stop moving
+            if (this.repathRetryCount > 5) {
+                // Give up, stop moving — harvesters will auto-retry via state machine
                 this.path = null;
                 this.moving = false;
                 this.repathRetryCount = 0;
+                // For harvesters, add a brief cooldown so they don't immediately try the same path
+                if (this.type === 'harvester') {
+                    this._harvestRetryDelay = Date.now() + 1500 + Math.random() * 1500;
+                }
                 return;
             }
 
@@ -442,6 +495,13 @@ class Unit extends Entity {
             if (this.pathIndex >= this.path.length) {
                 this.path = null;
                 this.moving = false;
+
+                // After sidestep, repath to original destination
+                if (this._repathAfterSidestep) {
+                    const dest = this._repathAfterSidestep;
+                    this._repathAfterSidestep = null;
+                    this.startPath(dest.x, dest.y, game);
+                }
             }
         } else {
             // Interpolate position
@@ -525,6 +585,9 @@ class Unit extends Entity {
             this.path = null;
         } else if (!this.moving) {
             // Not on spice and not already walking - find some
+            // Respect retry delay from collision resolution
+            if (this._harvestRetryDelay && Date.now() < this._harvestRetryDelay) return;
+            this._harvestRetryDelay = null;
             this._findNextSpice(game);
         }
         // If moving, processMovement() handles it - we stay in 'harvesting' state
@@ -994,11 +1057,24 @@ class Unit extends Entity {
                 break;
         }
 
-        // Clamp to map bounds
+        // Soft map bounds — allow brief overshoot but curve back naturally
         const mapPxW = MAP_WIDTH * TILE_SIZE;
         const mapPxH = MAP_HEIGHT * TILE_SIZE;
-        this.x = Math.max(TILE_SIZE, Math.min(mapPxW - TILE_SIZE, this.x));
-        this.y = Math.max(TILE_SIZE, Math.min(mapPxH - TILE_SIZE, this.y));
+        const margin = TILE_SIZE * 2;
+        const hardLimit = TILE_SIZE * 6;
+        const pullStrength = 0.08;
+
+        let pullX = 0, pullY = 0;
+        if (this.x < margin) pullX = (margin - this.x) * pullStrength;
+        if (this.x > mapPxW - margin) pullX = (mapPxW - margin - this.x) * pullStrength;
+        if (this.y < margin) pullY = (margin - this.y) * pullStrength;
+        if (this.y > mapPxH - margin) pullY = (mapPxH - margin - this.y) * pullStrength;
+        this.x += pullX;
+        this.y += pullY;
+
+        // Hard clamp so they can't fly away forever
+        this.x = Math.max(-hardLimit, Math.min(mapPxW + hardLimit, this.x));
+        this.y = Math.max(-hardLimit, Math.min(mapPxH + hardLimit, this.y));
 
         // Update tile position based on pixel position
         this.tx = Math.floor(this.x / TILE_SIZE);
@@ -1043,37 +1119,43 @@ class Unit extends Entity {
             return;
         }
 
-        // Angular velocity: v = r * omega => omega = v / r
-        const omega = (spd / orbitRadius) * this._orbitDir;
-
-        // Calculate current angle and advance it
-        const currentAngle = Math.atan2(dy, dx);
-        const newAngle = currentAngle + omega;
-
-        // Place on the circle (lerp toward orbit radius if not exactly on it)
-        const r = dist + (orbitRadius - dist) * 0.05;
-        this.x = driftX + Math.cos(newAngle) * r;
-        this.y = driftY + Math.sin(newAngle) * r;
-
-        // Face direction of travel (tangent to the circle)
-        const tangentX = -Math.sin(newAngle) * this._orbitDir;
-        const tangentY = Math.cos(newAngle) * this._orbitDir;
-        this.targetDirection = Math.atan2(tangentY, tangentX) + Math.PI / 2;
-        this._smoothTurnBody(game.deltaTime);
-
-        // Apply separation from other aircraft
+        // Check separation from other aircraft — push orbit radius outward instead of jittering position
+        let radiusPush = 0;
         for (const e of game.entities) {
             if (e === this || !e.isAircraft || e.hp <= 0) continue;
             const sx = this.x - e.x;
             const sy = this.y - e.y;
             const sd = Math.sqrt(sx * sx + sy * sy);
-            const separationDist = TILE_SIZE * 3;
+            const separationDist = TILE_SIZE * 4;
             if (sd < separationDist && sd > 0) {
-                const force = ((separationDist - sd) / separationDist) * spd * 0.5;
-                this.x += (sx / sd) * force;
-                this.y += (sy / sd) * force;
+                radiusPush += ((separationDist - sd) / separationDist) * TILE_SIZE * 2;
             }
         }
+        const effectiveRadius = orbitRadius + radiusPush;
+
+        // Angular velocity: v = r * omega => omega = v / r
+        const omega = (spd / effectiveRadius) * this._orbitDir;
+
+        // Calculate current angle and advance it
+        const currentAngle = Math.atan2(dy, dx);
+        const newAngle = currentAngle + omega;
+
+        // Smoothly converge toward orbit radius (gentle lerp avoids snapping)
+        const r = dist + (effectiveRadius - dist) * 0.03;
+        this.x = driftX + Math.cos(newAngle) * r;
+        this.y = driftY + Math.sin(newAngle) * r;
+
+        // Face direction of travel — use actual movement delta for accuracy
+        if (!this._prevOX) this._prevOX = this.x;
+        if (!this._prevOY) this._prevOY = this.y;
+        const moveDX = this.x - this._prevOX;
+        const moveDY = this.y - this._prevOY;
+        this._prevOX = this.x;
+        this._prevOY = this.y;
+        if (moveDX * moveDX + moveDY * moveDY > 0.01) {
+            this.targetDirection = Math.atan2(moveDY, moveDX) + Math.PI / 2;
+        }
+        this._smoothTurnBody(game.deltaTime);
 
         this.moving = true;
         // Update tile position
