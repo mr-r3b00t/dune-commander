@@ -1313,9 +1313,11 @@ class Game {
                 lastWormSpawn: this.lastWormSpawn,
                 lastFremenSpawn: this.lastFremenSpawn,
                 lastSardaukarSpawn: this.lastSardaukarSpawn,
+                difficulty: this.difficulty,
                 map: {
                     tiles: this.map.tiles,
-                    spiceAmount: this.map.spiceAmount
+                    spiceAmount: this.map.spiceAmount,
+                    explored: this.map.explored
                 },
                 entities: this.entities.map(e => this._serializeEntity(e)),
                 sandworms: this.sandworms.map(w => ({
@@ -1386,6 +1388,7 @@ class Game {
             this.spiceStored = state.spiceStored;
             this.enemyCredits = state.enemyCredits;
             this.gameOver = state.gameOver;
+            if (state.enemyHouse) this.enemyHouse = state.enemyHouse;
             this.camera.x = state.camera.x;
             this.camera.y = state.camera.y;
             this.gameStartTime = state.gameStartTime;
@@ -1393,15 +1396,32 @@ class Game {
             this.lastFremenSpawn = state.lastFremenSpawn;
             this.lastSardaukarSpawn = state.lastSardaukarSpawn;
 
+            // Restore difficulty
+            if (state.difficulty) {
+                this.difficulty = state.difficulty;
+                this.diffSettings = DIFFICULTY[this.difficulty] || DIFFICULTY.medium;
+            }
+
             // Restore map
             this.map.tiles = state.map.tiles;
             this.map.spiceAmount = state.map.spiceAmount;
+            if (state.map.explored) {
+                this.map.explored = state.map.explored;
+            } else {
+                // Old save without explored data — reveal all tiles so map isn't black
+                for (let y = 0; y < MAP_HEIGHT; y++) {
+                    for (let x = 0; x < MAP_WIDTH; x++) {
+                        this.map.explored[y][x] = true;
+                    }
+                }
+            }
             this.map._terrainCacheDirty = true; // force terrain redraw
 
-            // Clear occupied grid
+            // Clear occupied and buildReserved grids
             for (let y = 0; y < MAP_HEIGHT; y++) {
                 for (let x = 0; x < MAP_WIDTH; x++) {
                     this.map.occupied[y][x] = null;
+                    this.map.buildReserved[y][x] = null;
                 }
             }
 
