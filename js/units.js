@@ -793,14 +793,8 @@ class Unit extends Entity {
                     if (dist > TILE_SIZE * 4) {
                         this._flyToward(hx, hy, game);
                     } else {
-                        // Orbit with unique offset per aircraft
-                        if (!this._orbitOffset) this._orbitOffset = Math.random() * Math.PI * 2;
-                        if (!this._orbitSpeed) this._orbitSpeed = 2000 + Math.random() * 1500;
-                        this.direction += 1.5 * (game.deltaTime / 1000);
-                        const orbitR = TILE_SIZE * (2.5 + Math.random() * 0.01);
-                        const ox = hx + Math.cos(Date.now() / this._orbitSpeed + this._orbitOffset) * orbitR;
-                        const oy = hy + Math.sin(Date.now() / this._orbitSpeed + this._orbitOffset) * orbitR;
-                        this._flyToward(ox, oy, game);
+                        // Smooth circular orbit around helipad
+                        this._orbitCircle(hx, hy, game);
                     }
                 }
                 break;
@@ -905,15 +899,9 @@ class Unit extends Entity {
                         break;
                     }
                 }
-                // Circle the patrol point with unique orbit per aircraft
+                // Circle the patrol point with smooth circular flight
                 if (this._patrolCenter) {
-                    if (!this._orbitOffset) this._orbitOffset = Math.random() * Math.PI * 2;
-                    if (!this._orbitRadius) this._orbitRadius = TILE_SIZE * (2.5 + Math.random() * 2);
-                    if (!this._orbitSpeed) this._orbitSpeed = 2000 + Math.random() * 1500;
-                    const angle = Date.now() / this._orbitSpeed + this._orbitOffset;
-                    const ox = this._patrolCenter.x + Math.cos(angle) * this._orbitRadius;
-                    const oy = this._patrolCenter.y + Math.sin(angle) * this._orbitRadius;
-                    this._flyToward(ox, oy, game);
+                    this._orbitCircle(this._patrolCenter.x, this._patrolCenter.y, game);
                 } else {
                     this.state = 'idle';
                 }
@@ -974,13 +962,7 @@ class Unit extends Entity {
                     }
                     // Orbit near the helipad while waiting
                     if (this.homeHelipad && this.homeHelipad.hp > 0) {
-                        if (!this._orbitOffset) this._orbitOffset = Math.random() * Math.PI * 2;
-                        if (!this._orbitSpeed) this._orbitSpeed = 2000 + Math.random() * 1500;
-                        const waitAngle = Date.now() / this._orbitSpeed + this._orbitOffset;
-                        const waitR = TILE_SIZE * 4;
-                        const wx = this.homeHelipad.x + Math.cos(waitAngle) * waitR;
-                        const wy = this.homeHelipad.y + Math.sin(waitAngle) * waitR;
-                        this._flyToward(wx, wy, game);
+                        this._orbitCircle(this.homeHelipad.x, this.homeHelipad.y, game);
                     } else {
                         this._findNewHelipad(game);
                         if (this.homeHelipad) {
@@ -1019,6 +1001,82 @@ class Unit extends Entity {
         this.y = Math.max(TILE_SIZE, Math.min(mapPxH - TILE_SIZE, this.y));
 
         // Update tile position based on pixel position
+        this.tx = Math.floor(this.x / TILE_SIZE);
+        this.ty = Math.floor(this.y / TILE_SIZE);
+    }
+
+    _orbitCircle(centerX, centerY, game) {
+        // Initialize unique orbit parameters per aircraft
+        if (!this._orbitOffset) this._orbitOffset = Math.random() * Math.PI * 2;
+        if (!this._orbitBaseRadius) this._orbitBaseRadius = TILE_SIZE * (2.5 + Math.random() * 2);
+        if (!this._orbitDir) this._orbitDir = Math.random() < 0.5 ? 1 : -1; // CW or CCW
+        if (!this._orbitDriftAngle) this._orbitDriftAngle = Math.random() * Math.PI * 2;
+        if (!this._orbitDriftSpeed) this._orbitDriftSpeed = 0.0003 + Math.random() * 0.0005;
+        if (!this._orbitRadiusPhase) this._orbitRadiusPhase = Math.random() * Math.PI * 2;
+        if (!this._nextDirChange) this._nextDirChange = Date.now() + 15000 + Math.random() * 30000;
+
+        // Periodically reverse orbit direction for variety
+        const now = Date.now();
+        if (now > this._nextDirChange) {
+            this._orbitDir *= -1;
+            this._nextDirChange = now + 15000 + Math.random() * 30000;
+        }
+
+        // Oscillate radius: base ± 30% over time
+        const radiusWobble = Math.sin(now * 0.0004 + this._orbitRadiusPhase) * 0.3;
+        const orbitRadius = this._orbitBaseRadius * (1 + radiusWobble);
+
+        // Drift the orbit center slowly — creates wandering patrol area
+        this._orbitDriftAngle += this._orbitDriftSpeed * game.deltaTime;
+        const driftRange = TILE_SIZE * 3;
+        const driftX = centerX + Math.cos(this._orbitDriftAngle) * driftRange;
+        const driftY = centerY + Math.sin(this._orbitDriftAngle * 0.7 + 1.3) * driftRange; // different freq for figure-8ish drift
+
+        const dx = this.x - driftX;
+        const dy = this.y - driftY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const spd = this.speed * (game.deltaTime / 1000) * TILE_SIZE * 1.5;
+
+        if (dist < orbitRadius * 0.3) {
+            // Too close to center — fly outward first
+            this._flyToward(driftX + dx / (dist || 1) * orbitRadius, driftY + dy / (dist || 1) * orbitRadius, game);
+            return;
+        }
+
+        // Angular velocity: v = r * omega => omega = v / r
+        const omega = (spd / orbitRadius) * this._orbitDir;
+
+        // Calculate current angle and advance it
+        const currentAngle = Math.atan2(dy, dx);
+        const newAngle = currentAngle + omega;
+
+        // Place on the circle (lerp toward orbit radius if not exactly on it)
+        const r = dist + (orbitRadius - dist) * 0.05;
+        this.x = driftX + Math.cos(newAngle) * r;
+        this.y = driftY + Math.sin(newAngle) * r;
+
+        // Face direction of travel (tangent to the circle)
+        const tangentX = -Math.sin(newAngle) * this._orbitDir;
+        const tangentY = Math.cos(newAngle) * this._orbitDir;
+        this.targetDirection = Math.atan2(tangentY, tangentX) + Math.PI / 2;
+        this._smoothTurnBody(game.deltaTime);
+
+        // Apply separation from other aircraft
+        for (const e of game.entities) {
+            if (e === this || !e.isAircraft || e.hp <= 0) continue;
+            const sx = this.x - e.x;
+            const sy = this.y - e.y;
+            const sd = Math.sqrt(sx * sx + sy * sy);
+            const separationDist = TILE_SIZE * 3;
+            if (sd < separationDist && sd > 0) {
+                const force = ((separationDist - sd) / separationDist) * spd * 0.5;
+                this.x += (sx / sd) * force;
+                this.y += (sy / sd) * force;
+            }
+        }
+
+        this.moving = true;
+        // Update tile position
         this.tx = Math.floor(this.x / TILE_SIZE);
         this.ty = Math.floor(this.y / TILE_SIZE);
     }
