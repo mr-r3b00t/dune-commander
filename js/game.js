@@ -586,7 +586,16 @@ class Game {
             }
         }
 
+        // Free helipad if an aircraft was rearming on it
+        if (entity.isUnit && entity.isAircraft && entity.homeHelipad && entity.homeHelipad._occupiedBy === entity) {
+            entity.homeHelipad._occupiedBy = null;
+        }
+
         if (entity.isBuilding) {
+            // If a helipad is destroyed, clear its occupant reference
+            if (entity.type === 'helipad' && entity._occupiedBy) {
+                entity._occupiedBy = null;
+            }
             this.map.clearOccupied(entity.tx, entity.ty, entity.width, entity.height);
             this.map.clearBuildingClearance(entity.id);
         } else if (entity.isUnit) {

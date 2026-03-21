@@ -207,8 +207,15 @@ class Building extends Entity {
                 if (!game.sandworms.includes(this.target)) {
                     this.target = null;
                 }
-            } else if (this.target.hp <= 0) {
+            } else if (this.target.hp <= 0 || !game.entities.includes(this.target)) {
                 this.target = null;
+            } else {
+                // Check if target moved out of range
+                const etx = this.target.isBuilding ? this.target.tx + this.target.width / 2 : this.target.tx;
+                const ety = this.target.isBuilding ? this.target.ty + this.target.height / 2 : this.target.ty;
+                if (tileDistance(cx, cy, etx, ety) > this.attackRange + 1) {
+                    this.target = null;
+                }
             }
         }
 

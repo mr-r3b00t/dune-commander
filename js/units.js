@@ -455,7 +455,10 @@ class Unit extends Entity {
     }
 
     updateAttack(game) {
-        if (!this.target || this.target.hp <= 0) {
+        // Clear target if dead, removed from game, or allied
+        if (!this.target || this.target.hp <= 0 ||
+            !game.entities.includes(this.target) ||
+            this._areAllied(this.owner, this.target.owner, game)) {
             this.target = null;
             this.state = 'idle';
             return;
@@ -640,16 +643,17 @@ class Unit extends Entity {
         let best = null;
         let bestDist = Infinity;
         for (const e of game.entities) {
-            if (e.owner !== this.owner && e.owner !== null && e.hp > 0) {
-                // Fremen alliance: Fremen and Atreides (player if atreides, or enemy if atreides) don't target each other
-                if (this._areAllied(this.owner, e.owner, game)) continue;
-                const etx = e.isBuilding ? e.tx + Math.floor(e.width / 2) : e.tx;
-                const ety = e.isBuilding ? e.ty + Math.floor(e.height / 2) : e.ty;
-                const d = tileDistance(this.tx, this.ty, etx, ety);
-                if (d < bestDist && d <= this.attackRange + 5) {
-                    bestDist = d;
-                    best = e;
-                }
+            if (e === this) continue;
+            if (e.owner === this.owner) continue;
+            if (e.owner === null || e.hp <= 0) continue;
+            // Alliance checks: Fremen+Atreides, Sardaukar+Harkonnen
+            if (this._areAllied(this.owner, e.owner, game)) continue;
+            const etx = e.isBuilding ? e.tx + Math.floor(e.width / 2) : e.tx;
+            const ety = e.isBuilding ? e.ty + Math.floor(e.height / 2) : e.ty;
+            const d = tileDistance(this.tx, this.ty, etx, ety);
+            if (d < bestDist && d <= this.attackRange + 5) {
+                bestDist = d;
+                best = e;
             }
         }
         return best;
@@ -789,11 +793,13 @@ class Unit extends Entity {
                     if (dist > TILE_SIZE * 4) {
                         this._flyToward(hx, hy, game);
                     } else {
-                        // Orbit
+                        // Orbit with unique offset per aircraft
+                        if (!this._orbitOffset) this._orbitOffset = Math.random() * Math.PI * 2;
+                        if (!this._orbitSpeed) this._orbitSpeed = 2000 + Math.random() * 1500;
                         this.direction += 1.5 * (game.deltaTime / 1000);
-                        const orbitR = TILE_SIZE * 2.5;
-                        const ox = hx + Math.cos(Date.now() / 2000) * orbitR;
-                        const oy = hy + Math.sin(Date.now() / 2000) * orbitR;
+                        const orbitR = TILE_SIZE * (2.5 + Math.random() * 0.01);
+                        const ox = hx + Math.cos(Date.now() / this._orbitSpeed + this._orbitOffset) * orbitR;
+                        const oy = hy + Math.sin(Date.now() / this._orbitSpeed + this._orbitOffset) * orbitR;
                         this._flyToward(ox, oy, game);
                     }
                 }
@@ -899,12 +905,14 @@ class Unit extends Entity {
                         break;
                     }
                 }
-                // Circle the patrol point
+                // Circle the patrol point with unique orbit per aircraft
                 if (this._patrolCenter) {
-                    const orbitR = TILE_SIZE * 3;
-                    const angle = Date.now() / 2500;
-                    const ox = this._patrolCenter.x + Math.cos(angle) * orbitR;
-                    const oy = this._patrolCenter.y + Math.sin(angle) * orbitR;
+                    if (!this._orbitOffset) this._orbitOffset = Math.random() * Math.PI * 2;
+                    if (!this._orbitRadius) this._orbitRadius = TILE_SIZE * (2.5 + Math.random() * 2);
+                    if (!this._orbitSpeed) this._orbitSpeed = 2000 + Math.random() * 1500;
+                    const angle = Date.now() / this._orbitSpeed + this._orbitOffset;
+                    const ox = this._patrolCenter.x + Math.cos(angle) * this._orbitRadius;
+                    const oy = this._patrolCenter.y + Math.sin(angle) * this._orbitRadius;
                     this._flyToward(ox, oy, game);
                 } else {
                     this.state = 'idle';
@@ -920,22 +928,67 @@ class Unit extends Entity {
                         break;
                     }
                 }
-                const hx = this.homeHelipad.x;
-                const hy = this.homeHelipad.y;
-                const hDist = Math.sqrt((this.x - hx) ** 2 + (this.y - hy) ** 2);
-                if (hDist < TILE_SIZE) {
-                    // Landed — start rearming
-                    this.state = 'rearming';
-                    this.rearmTimer = 0;
-                    this.x = hx;
-                    this.y = hy;
-                    this.tx = this.homeHelipad.tx + Math.floor(this.homeHelipad.width / 2);
-                    this.ty = this.homeHelipad.ty + Math.floor(this.homeHelipad.height / 2);
-                    if (this.owner === 'player') {
-                        game.audio.speak('Rearming');
+                // Check if our helipad is occupied by another aircraft
+                if (this.homeHelipad._occupiedBy && this.homeHelipad._occupiedBy !== this &&
+                    this.homeHelipad._occupiedBy.hp > 0) {
+                    // Try to find a free helipad
+                    const freeHelipad = this._findFreeHelipad(game);
+                    if (freeHelipad) {
+                        this.homeHelipad = freeHelipad;
+                    } else {
+                        // All helipads busy — orbit and wait
+                        this.state = 'waiting_for_helipad';
+                        break;
                     }
-                } else {
-                    this._flyToward(hx, hy, game);
+                }
+                {
+                    const rhx = this.homeHelipad.x;
+                    const rhy = this.homeHelipad.y;
+                    const rhDist = Math.sqrt((this.x - rhx) ** 2 + (this.y - rhy) ** 2);
+                    if (rhDist < TILE_SIZE) {
+                        // Landed — mark helipad occupied and start rearming
+                        this.homeHelipad._occupiedBy = this;
+                        this.state = 'rearming';
+                        this.rearmTimer = 0;
+                        this.x = rhx;
+                        this.y = rhy;
+                        this.tx = this.homeHelipad.tx + Math.floor(this.homeHelipad.width / 2);
+                        this.ty = this.homeHelipad.ty + Math.floor(this.homeHelipad.height / 2);
+                        if (this.owner === 'player') {
+                            game.audio.speak('Rearming');
+                        }
+                    } else {
+                        this._flyToward(rhx, rhy, game);
+                    }
+                }
+                break;
+
+            case 'waiting_for_helipad':
+                // Orbit near current helipad waiting for a free pad
+                {
+                    const freeNow = this._findFreeHelipad(game);
+                    if (freeNow) {
+                        this.homeHelipad = freeNow;
+                        this.state = 'returning_to_helipad';
+                        break;
+                    }
+                    // Orbit near the helipad while waiting
+                    if (this.homeHelipad && this.homeHelipad.hp > 0) {
+                        if (!this._orbitOffset) this._orbitOffset = Math.random() * Math.PI * 2;
+                        if (!this._orbitSpeed) this._orbitSpeed = 2000 + Math.random() * 1500;
+                        const waitAngle = Date.now() / this._orbitSpeed + this._orbitOffset;
+                        const waitR = TILE_SIZE * 4;
+                        const wx = this.homeHelipad.x + Math.cos(waitAngle) * waitR;
+                        const wy = this.homeHelipad.y + Math.sin(waitAngle) * waitR;
+                        this._flyToward(wx, wy, game);
+                    } else {
+                        this._findNewHelipad(game);
+                        if (this.homeHelipad) {
+                            this.state = 'returning_to_helipad';
+                        } else {
+                            this.state = 'idle';
+                        }
+                    }
                 }
                 break;
 
@@ -946,6 +999,10 @@ class Unit extends Entity {
                     this.gunAmmo = this.maxGunAmmo;
                     this.missileAmmo = this.maxMissileAmmo;
                     this.rearming = false;
+                    // Free the helipad
+                    if (this.homeHelipad && this.homeHelipad._occupiedBy === this) {
+                        this.homeHelipad._occupiedBy = null;
+                    }
                     this.state = 'idle';
                     if (this.owner === 'player') {
                         game.audio.speak('Ornithopter re-armed');
@@ -977,7 +1034,7 @@ class Unit extends Entity {
         let ny = dy / dist;
 
         // Separation from other ornithopters — push apart if too close
-        const separationDist = TILE_SIZE * 2;
+        const separationDist = TILE_SIZE * 4;
         let sepX = 0, sepY = 0;
         for (const e of game.entities) {
             if (e === this || !e.isAircraft || e.hp <= 0) continue;
@@ -985,16 +1042,16 @@ class Unit extends Entity {
             const sy = this.y - e.y;
             const sd = Math.sqrt(sx * sx + sy * sy);
             if (sd < separationDist && sd > 0) {
-                const force = (separationDist - sd) / separationDist;
+                const force = ((separationDist - sd) / separationDist) * 1.5;
                 sepX += (sx / sd) * force;
                 sepY += (sy / sd) * force;
             }
         }
-        // Blend separation into movement direction
+        // Blend separation into movement direction (separation takes priority)
         if (sepX !== 0 || sepY !== 0) {
             const sepLen = Math.sqrt(sepX * sepX + sepY * sepY);
-            nx = nx * 0.6 + (sepX / sepLen) * 0.4;
-            ny = ny * 0.6 + (sepY / sepLen) * 0.4;
+            nx = nx * 0.4 + (sepX / sepLen) * 0.6;
+            ny = ny * 0.4 + (sepY / sepLen) * 0.6;
             const nLen = Math.sqrt(nx * nx + ny * ny);
             if (nLen > 0) { nx /= nLen; ny /= nLen; }
         }
@@ -1036,6 +1093,27 @@ class Unit extends Entity {
             }
         }
         this.homeHelipad = best;
+    }
+
+    _findFreeHelipad(game) {
+        // Find nearest helipad that isn't occupied by another aircraft
+        let best = null;
+        let bestDist = Infinity;
+        for (const e of game.entities) {
+            if (e.type === 'helipad' && e.owner === this.owner && e.hp > 0) {
+                // Check if occupied by someone else
+                if (e._occupiedBy && e._occupiedBy !== this && e._occupiedBy.hp > 0 &&
+                    (e._occupiedBy.state === 'rearming' || e._occupiedBy.state === 'returning_to_helipad')) {
+                    continue; // This pad is busy
+                }
+                const d = Math.sqrt((this.x - e.x) ** 2 + (this.y - e.y) ** 2);
+                if (d < bestDist) {
+                    bestDist = d;
+                    best = e;
+                }
+            }
+        }
+        return best;
     }
 
     _getWeaponSound() {
@@ -1260,6 +1338,11 @@ class Unit extends Entity {
                 ctx.font = '9px monospace';
                 ctx.fillStyle = '#8cf';
                 ctx.fillText('RTB', screenX, ammoY + 10);
+            } else if (this.state === 'waiting_for_helipad') {
+                ctx.font = '9px monospace';
+                const pulse = Math.sin(Date.now() / 400) > 0 ? '#ff0' : '#aa0';
+                ctx.fillStyle = pulse;
+                ctx.fillText('WAITING', screenX, ammoY + 10);
             } else if (this.state === 'rearming') {
                 ctx.font = '9px monospace';
                 const pulse = Math.sin(Date.now() / 300) > 0 ? '#0f0' : '#0a0';
