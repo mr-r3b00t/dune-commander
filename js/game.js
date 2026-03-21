@@ -1,7 +1,10 @@
 // Main Game class
 class Game {
-    constructor(playerHouse) {
+    constructor(playerHouse, difficulty) {
         this.playerHouse = playerHouse;
+        this.difficulty = difficulty || 'medium';
+        this.diffSettings = DIFFICULTY[this.difficulty] || DIFFICULTY.medium;
+
         // Pick enemy house (different from player)
         const houses = ['atreides', 'harkonnen', 'ordos'];
         const enemyHouses = houses.filter(h => h !== playerHouse);
@@ -22,12 +25,14 @@ class Game {
         this.projectiles = [];
         this.credits = 1500;
         this.spiceStored = 0;
-        this.enemyCredits = 1500;
+        this.enemyCredits = this.diffSettings.enemyStartCredits;
         this.running = true;
         this.paused = false;
         this.deltaTime = 0;
         this.lastTime = 0;
         this.gameOver = false;
+        this.gameStartTime = Date.now();
+        this.stats = { unitsBuilt: 0, unitsLost: 0, enemiesKilled: 0, buildingsBuilt: 0, spiceHarvested: 0 };
         this.lastAutoSave = 0;
         this.autoSaveInterval = 30000; // autosave every 30 seconds
 
@@ -572,6 +577,15 @@ class Game {
             this.entities.splice(idx, 1);
         }
 
+        // Track stats for kills/losses
+        if (entity.hp <= 0 && this.stats) {
+            if (entity.owner === 'player') {
+                this.stats.unitsLost++;
+            } else if (entity.owner === 'enemy') {
+                this.stats.enemiesKilled++;
+            }
+        }
+
         if (entity.isBuilding) {
             this.map.clearOccupied(entity.tx, entity.ty, entity.width, entity.height);
             this.map.clearBuildingClearance(entity.id);
@@ -588,12 +602,53 @@ class Game {
         if (playerBuildings.length === 0 && !this.gameOver) {
             this.gameOver = true;
             this.audio.speak('Mission failed. Your base has been destroyed.', true);
-            setTimeout(() => alert('DEFEAT! Your base has been destroyed.'), 2000);
+            setTimeout(() => this.showGameOverModal(false), 2000);
         } else if (enemyBuildings.length === 0 && !this.gameOver) {
             this.gameOver = true;
             this.audio.speak('Mission accomplished. The enemy has been vanquished.', true);
-            setTimeout(() => alert('VICTORY! The enemy has been vanquished!'), 2000);
+            setTimeout(() => this.showGameOverModal(true), 2000);
         }
+    }
+
+    showGameOverModal(isVictory) {
+        const modal = document.getElementById('game-over-modal');
+        const title = document.getElementById('game-over-title');
+        const icon = document.getElementById('game-over-icon');
+        const message = document.getElementById('game-over-message');
+        const statsEl = document.getElementById('game-over-stats');
+
+        title.textContent = isVictory ? 'VICTORY' : 'DEFEAT';
+        title.className = isVictory ? 'victory' : 'defeat';
+        icon.textContent = isVictory ? '⚔️' : '💀';
+        message.textContent = isVictory
+            ? 'The enemy has been vanquished. Arrakis is yours.'
+            : 'Your base has been destroyed. The spice is lost.';
+
+        // Calculate game duration
+        const elapsed = Math.floor((Date.now() - this.gameStartTime) / 1000);
+        const mins = Math.floor(elapsed / 60);
+        const secs = elapsed % 60;
+
+        const diffLabel = this.difficulty.charAt(0).toUpperCase() + this.difficulty.slice(1);
+        statsEl.innerHTML = `
+            <div class="modal-stat"><span class="stat-value">${diffLabel}</span><span class="stat-label">Difficulty</span></div>
+            <div class="modal-stat"><span class="stat-value">${mins}:${secs.toString().padStart(2, '0')}</span><span class="stat-label">Duration</span></div>
+            <div class="modal-stat"><span class="stat-value">${this.stats.enemiesKilled}</span><span class="stat-label">Enemies Killed</span></div>
+            <div class="modal-stat"><span class="stat-value">${this.stats.unitsLost}</span><span class="stat-label">Units Lost</span></div>
+            <div class="modal-stat"><span class="stat-value">${this.credits}</span><span class="stat-label">Credits</span></div>
+        `;
+
+        modal.classList.remove('hidden');
+
+        // Button handlers
+        document.getElementById('game-over-restart').onclick = () => {
+            modal.classList.add('hidden');
+            location.reload();
+        };
+        document.getElementById('game-over-menu').onclick = () => {
+            modal.classList.add('hidden');
+            location.reload();
+        };
     }
 
     addProjectile(x, y, target, damage, owner, sourceType) {

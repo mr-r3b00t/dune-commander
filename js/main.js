@@ -1,10 +1,11 @@
 // Main entry point
 let game = null;
+let selectedDifficulty = 'easy';
 
 function startGame(house, loadSave) {
     document.getElementById('main-menu').classList.add('hidden');
 
-    game = new Game(house);
+    game = new Game(house, selectedDifficulty);
     game.start();
 
     if (loadSave) {
@@ -22,6 +23,15 @@ function startGame(house, loadSave) {
         });
     }
 }
+
+// Difficulty selection
+document.querySelectorAll('.diff-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedDifficulty = btn.dataset.diff;
+    });
+});
 
 // House selection
 document.querySelectorAll('.house-btn').forEach(btn => {

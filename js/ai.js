@@ -2,16 +2,28 @@
 class AIPlayer {
     constructor(game) {
         this.game = game;
+        const diff = game.diffSettings || DIFFICULTY.medium;
         this.lastBuildTime = 0;
         this.lastAttackTime = Date.now(); // start timer from game start
-        this.buildInterval = 8000;
-        this.attackInterval = 90000; // 90 seconds between attacks
+        this.buildInterval = diff.aiBuildInterval;
+        this.attackInterval = diff.aiAttackInterval;
+        this.minAttackForce = diff.aiMinAttackForce;
+        this.unitCap = diff.aiUnitCap;
         this.state = 'building'; // building, attacking
-        this.buildOrder = [
-            'wind_trap', 'refinery', 'barracks', 'wind_trap',
-            'light_factory', 'refinery', 'heavy_factory', 'mg_turret', 'turret', 'turret',
-            'helipad', 'mg_turret'
-        ];
+        if (this.game.difficulty === 'hard') {
+            this.buildOrder = [
+                'wind_trap', 'refinery', 'barracks', 'wind_trap',
+                'light_factory', 'refinery', 'heavy_factory', 'mg_turret', 'turret', 'turret',
+                'helipad', 'mg_turret', 'rocket_turret', 'refinery', 'wind_trap',
+                'turret', 'helipad', 'rocket_turret'
+            ];
+        } else {
+            this.buildOrder = [
+                'wind_trap', 'refinery', 'barracks', 'wind_trap',
+                'light_factory', 'refinery', 'heavy_factory', 'mg_turret', 'turret', 'turret',
+                'helipad', 'mg_turret'
+            ];
+        }
         this.buildIndex = 0;
         // Harkonnen AI gets devastators in their build order
         if (game.enemyHouse === 'harkonnen') {
@@ -100,7 +112,7 @@ class AIPlayer {
         const heavyFactory = this.game.entities.find(e => e.type === 'heavy_factory' && e.owner === 'enemy' && !e.currentBuild);
 
         const enemyUnits = this.game.entities.filter(e => e.isUnit && e.owner === 'enemy' && e.type !== 'harvester');
-        if (enemyUnits.length >= 20) return;
+        if (enemyUnits.length >= this.unitCap) return;
 
         let unitType = this.unitBuildOrder[this.unitBuildIndex % this.unitBuildOrder.length];
         const def = UNIT_DEFS[unitType];
@@ -156,7 +168,7 @@ class AIPlayer {
             e => e.isUnit && e.owner === 'enemy' && e.type !== 'harvester' && e.type !== 'ornithopter' && e.state === 'idle'
         );
 
-        if (combatUnits.length < 5) return;
+        if (combatUnits.length < this.minAttackForce) return;
 
         // Find player base
         const playerBuildings = this.game.entities.filter(e => e.isBuilding && e.owner === 'player');

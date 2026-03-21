@@ -5,6 +5,40 @@ const MAP_HEIGHT = 128;
 const MINIMAP_WIDTH = 184;
 const MINIMAP_HEIGHT = 140;
 
+// Difficulty settings
+const DIFFICULTY = {
+    easy: {
+        enemyStartCredits: 1000,
+        enemyIncomeMultiplier: 0.7,   // harvester earns less
+        aiBuildInterval: 12000,        // slower building
+        aiAttackInterval: 150000,      // attacks every 2.5 min
+        aiMinAttackForce: 7,           // needs more units to attack
+        aiUnitCap: 14,                 // fewer max units
+        aiDamageMultiplier: 0.75,      // enemy deals less damage
+        playerDamageMultiplier: 1.2,   // player deals more damage
+    },
+    medium: {
+        enemyStartCredits: 1500,
+        enemyIncomeMultiplier: 1.0,
+        aiBuildInterval: 8000,
+        aiAttackInterval: 90000,       // attacks every 1.5 min
+        aiMinAttackForce: 5,
+        aiUnitCap: 20,
+        aiDamageMultiplier: 1.0,
+        playerDamageMultiplier: 1.0,
+    },
+    hard: {
+        enemyStartCredits: 2500,
+        enemyIncomeMultiplier: 1.5,    // harvester earns more
+        aiBuildInterval: 5000,         // fast building
+        aiAttackInterval: 50000,       // attacks every 50 sec
+        aiMinAttackForce: 3,           // attacks with fewer units
+        aiUnitCap: 30,                 // many more units
+        aiDamageMultiplier: 1.25,      // enemy hits harder
+        playerDamageMultiplier: 0.9,   // player hits slightly weaker
+    }
+};
+
 // Terrain types
 const TERRAIN = {
     SAND: 0,

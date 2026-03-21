@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dune: Commander</title>
-    <link rel="stylesheet" href="style.css?v=31">
+    <link rel="stylesheet" href="style.css?v=33">
 </head>
 <body>
     <div id="game-container">
@@ -50,6 +50,23 @@
         <div class="menu-content">
             <h1>DUNE: COMMANDER</h1>
             <p class="subtitle">The Battle for Arrakis</p>
+            <div class="difficulty-select">
+                <h2>DIFFICULTY</h2>
+                <div class="difficulties">
+                    <button class="diff-btn active" data-diff="easy">
+                        <span>EASY</span>
+                        <small>Forgiving enemy</small>
+                    </button>
+                    <button class="diff-btn" data-diff="medium">
+                        <span>MEDIUM</span>
+                        <small>Balanced fight</small>
+                    </button>
+                    <button class="diff-btn" data-diff="hard">
+                        <span>HARD</span>
+                        <small>Ruthless AI</small>
+                    </button>
+                </div>
+            </div>
             <div class="house-select">
                 <h2>SELECT YOUR HOUSE</h2>
                 <div class="houses">
@@ -72,20 +89,33 @@
             </div>
         </div>
     </div>
-    <script src="js/constants.js?v=31"></script>
-    <script src="js/utils.js?v=31"></script>
-    <script src="js/map.js?v=31"></script>
-    <script src="js/pathfinding.js?v=31"></script>
-    <script src="js/entity.js?v=31"></script>
-    <script src="js/buildings.js?v=31"></script>
-    <script src="js/units.js?v=31"></script>
-    <script src="js/projectile.js?v=31"></script>
-    <script src="js/particles.js?v=31"></script>
-    <script src="js/ai.js?v=31"></script>
-    <script src="js/ui.js?v=31"></script>
-    <script src="js/sprites.js?v=31"></script>
-    <script src="js/audio.js?v=31"></script>
-    <script src="js/game.js?v=31"></script>
-    <script src="js/main.js?v=31"></script>
+    <!-- Game Over Modal -->
+    <div id="game-over-modal" class="overlay hidden">
+        <div class="modal-content">
+            <div id="game-over-icon" class="modal-icon"></div>
+            <h1 id="game-over-title"></h1>
+            <p id="game-over-message" class="modal-message"></p>
+            <div class="modal-stats" id="game-over-stats"></div>
+            <div class="modal-buttons">
+                <button id="game-over-restart" class="modal-btn primary">NEW BATTLE</button>
+                <button id="game-over-menu" class="modal-btn">MAIN MENU</button>
+            </div>
+        </div>
+    </div>
+    <script src="js/constants.js?v=33"></script>
+    <script src="js/utils.js?v=33"></script>
+    <script src="js/map.js?v=33"></script>
+    <script src="js/pathfinding.js?v=33"></script>
+    <script src="js/entity.js?v=33"></script>
+    <script src="js/buildings.js?v=33"></script>
+    <script src="js/units.js?v=33"></script>
+    <script src="js/projectile.js?v=33"></script>
+    <script src="js/particles.js?v=33"></script>
+    <script src="js/ai.js?v=33"></script>
+    <script src="js/ui.js?v=33"></script>
+    <script src="js/sprites.js?v=33"></script>
+    <script src="js/audio.js?v=33"></script>
+    <script src="js/game.js?v=33"></script>
+    <script src="js/main.js?v=33"></script>
 </body>
 </html>

@@ -593,7 +593,8 @@ class Unit extends Entity {
                 game.credits += creditsToAdd;
                 game.spiceStored += spiceToRemove;
             } else {
-                game.enemyCredits += creditsToAdd;
+                const incomeMul = (game.diffSettings && game.diffSettings.enemyIncomeMultiplier) || 1;
+                game.enemyCredits += Math.round(creditsToAdd * incomeMul);
             }
         }
 
@@ -606,7 +607,8 @@ class Unit extends Entity {
                     game.credits += remaining;
                     game.spiceStored += this.spiceCarried;
                 } else {
-                    game.enemyCredits += remaining;
+                    const incomeMul = (game.diffSettings && game.diffSettings.enemyIncomeMultiplier) || 1;
+                    game.enemyCredits += Math.round(remaining * incomeMul);
                 }
             }
             this.spiceCarried = 0;

@@ -17,6 +17,14 @@ class Entity {
     }
 
     takeDamage(amount, attackerOwner, game) {
+        // Apply difficulty damage multipliers
+        if (game && game.diffSettings) {
+            if (attackerOwner === 'enemy') {
+                amount = Math.round(amount * game.diffSettings.aiDamageMultiplier);
+            } else if (attackerOwner === 'player') {
+                amount = Math.round(amount * game.diffSettings.playerDamageMultiplier);
+            }
+        }
         this.hp -= amount;
         if (this.hp <= 0) {
             this.hp = 0;
