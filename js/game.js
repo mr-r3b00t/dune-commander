@@ -733,7 +733,7 @@ class Game {
         if ((mouseScroll && this.mouse.y < edge) || this.keys['arrowup'] || this.keys['w']) {
             this.camera.y -= this.scrollSpeed;
         }
-        if ((mouseScroll && this.mouse.y > this.canvas.height - edge) || this.keys['arrowdown']) {
+        if ((mouseScroll && this.mouse.y > this.canvas.height - edge) || this.keys['arrowdown'] || this.keys['s']) {
             this.camera.y += this.scrollSpeed;
         }
         this.clampCamera();
@@ -1301,7 +1301,9 @@ class Game {
     saveGame() {
         try {
             const state = {
-                version: 2,
+                version: 3,
+                mapWidth: MAP_WIDTH,
+                mapHeight: MAP_HEIGHT,
                 playerHouse: this.playerHouse,
                 enemyHouse: this.enemyHouse,
                 credits: this.credits,
@@ -1402,20 +1404,35 @@ class Game {
                 this.diffSettings = DIFFICULTY[this.difficulty] || DIFFICULTY.medium;
             }
 
-            // Restore map
-            this.map.tiles = state.map.tiles;
-            this.map.spiceAmount = state.map.spiceAmount;
-            if (state.map.explored) {
-                this.map.explored = state.map.explored;
-            } else {
-                // Old save without explored data — reveal all tiles so map isn't black
+            // Restore map — validate dimensions match current map size
+            const savedH = state.map.tiles ? state.map.tiles.length : 0;
+            const savedW = savedH > 0 && state.map.tiles[0] ? state.map.tiles[0].length : 0;
+            if (savedW !== MAP_WIDTH || savedH !== MAP_HEIGHT) {
+                // Map dimensions changed since save — cannot restore, keep generated map
+                console.warn(`Save map size ${savedW}x${savedH} doesn't match current ${MAP_WIDTH}x${MAP_HEIGHT}, using new map`);
+                // Reveal all tiles so the map isn't black
                 for (let y = 0; y < MAP_HEIGHT; y++) {
                     for (let x = 0; x < MAP_WIDTH; x++) {
                         this.map.explored[y][x] = true;
                     }
                 }
+            } else {
+                this.map.tiles = state.map.tiles;
+                this.map.spiceAmount = state.map.spiceAmount;
+                if (state.map.explored) {
+                    this.map.explored = state.map.explored;
+                } else {
+                    // Old save without explored data — reveal all tiles so map isn't black
+                    for (let y = 0; y < MAP_HEIGHT; y++) {
+                        for (let x = 0; x < MAP_WIDTH; x++) {
+                            this.map.explored[y][x] = true;
+                        }
+                    }
+                }
             }
             this.map._terrainCacheDirty = true; // force terrain redraw
+            // Destroy and recreate terrain canvas to ensure clean state
+            this.map._terrainCanvas = null;
 
             // Clear occupied and buildReserved grids
             for (let y = 0; y < MAP_HEIGHT; y++) {
